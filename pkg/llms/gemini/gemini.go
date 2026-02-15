@@ -12,31 +12,28 @@ import (
 )
 
 type Client[T any] struct {
-	llmCfg model.LLMConfig
+	cfg model.GeneratorConfig
 }
 
-func NewStructureContentGenerator[T any](prompt string, llmOpts []model.LLMOption, opts ...model.GeneratorOption) (model.ContentGenerator[T], error) {
+func NewStructureContentGenerator[T any](prompt string, opts ...model.GeneratorOption) (model.ContentGenerator[T], error) {
 	const fn = "gemini.NewStructureContentGenerator"
 	cfg := model.ResolveGeneratorOpts(opts...)
-	llmCfg := model.ResolveLLMOpts(llmOpts...)
 	if prompt == "" {
 		return nil, utils.WrapIfNotNil(errors.New("prompt is required"), fn)
 	}
-	return &structuredGenerator[T]{llmCfg: llmCfg, prompt: prompt, cfg: cfg}, nil
+	return &structuredGenerator[T]{prompt: prompt, cfg: cfg}, nil
 }
 
-func NewStringContentGenerator(prompt string, llmOpts []model.LLMOption, opts ...model.GeneratorOption) (model.ContentGenerator[string], error) {
+func NewStringContentGenerator(prompt string, opts ...model.GeneratorOption) (model.ContentGenerator[string], error) {
 	const fn = "gemini.NewStringContentGenerator"
 	cfg := model.ResolveGeneratorOpts(opts...)
-	llmCfg := model.ResolveLLMOpts(llmOpts...)
 	if prompt == "" {
 		return nil, utils.WrapIfNotNil(errors.New("prompt is required"), fn)
 	}
-	return &textGenerator{llmCfg: llmCfg, prompt: prompt, cfg: cfg}, nil
+	return &textGenerator{prompt: prompt, cfg: cfg}, nil
 }
 
 type structuredGenerator[T any] struct {
-	llmCfg                 model.LLMConfig
 	prompt                 string
 	cfg                    model.GeneratorConfig
 	promptContextMu        sync.RWMutex
@@ -87,8 +84,8 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, error) {
 		g.cfg.Temperature,
 		g.cfg.MaxTokens,
 		len(g.cfg.Tools),
-		g.llmCfg.URL,
-		g.llmCfg.AuthToken != "",
+		g.cfg.URL,
+		g.cfg.AuthToken != "",
 	)
 
 	var zero T
@@ -98,7 +95,6 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, error) {
 }
 
 type textGenerator struct {
-	llmCfg                 model.LLMConfig
 	prompt                 string
 	cfg                    model.GeneratorConfig
 	promptContextMu        sync.RWMutex
@@ -148,8 +144,8 @@ func (g *textGenerator) Generate(ctx context.Context) (string, error) {
 		g.cfg.Temperature,
 		g.cfg.MaxTokens,
 		len(g.cfg.Tools),
-		g.llmCfg.URL,
-		g.llmCfg.AuthToken != "",
+		g.cfg.URL,
+		g.cfg.AuthToken != "",
 	)
 
 	err = errors.New("gemini text generation not implemented")

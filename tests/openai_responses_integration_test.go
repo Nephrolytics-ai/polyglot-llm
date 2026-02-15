@@ -34,19 +34,22 @@ func (s *OpenAIResponsesIntegrationSuite) TestCreateGeneratorAndGenerate() {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	llmOpts := []model.LLMOption{
+	opts := []model.GeneratorOption{
 		model.WithAuthToken(s.apiKey),
 	}
 	if s.baseURL != "" {
-		llmOpts = append(llmOpts, model.WithURL(s.baseURL))
+		opts = append(opts, model.WithURL(s.baseURL))
 	}
 
-	generator, err := openai_response.NewStringContentGenerator(
-		"How are you today.",
-		llmOpts,
+	opts = append(opts,
 		model.WithModel("gpt-5-mini"),
 		model.WithReasoningLevel(model.ReasoningLevelLow),
 		model.WithMaxTokens(256),
+	)
+
+	generator, err := openai_response.NewStringContentGenerator(
+		"How are you today.",
+		opts...,
 	)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), generator)

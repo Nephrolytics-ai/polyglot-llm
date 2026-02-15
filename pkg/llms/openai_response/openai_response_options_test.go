@@ -18,15 +18,13 @@ func TestGeneratorOptionValidationSuite(t *testing.T) {
 }
 
 func (s *GeneratorOptionValidationSuite) TestTemperatureOnReasoningModelReturnsErrorWhenStrict() {
-	cfg := model.ResolveGeneratorOpts(
-		model.WithModel("gpt-5-mini"),
-		model.WithTemperature(0.2),
-	)
-
 	_, err := normalizeGeneratorOptionsForModel(
-		model.ResolveLLMOpts(model.WithIgnoreInvalidGeneratorOptions(false)),
 		"gpt-5-mini",
-		cfg,
+		model.ResolveGeneratorOpts(
+			model.WithIgnoreInvalidGeneratorOptions(false),
+			model.WithModel("gpt-5-mini"),
+			model.WithTemperature(0.2),
+		),
 		nil,
 	)
 
@@ -35,15 +33,13 @@ func (s *GeneratorOptionValidationSuite) TestTemperatureOnReasoningModelReturnsE
 }
 
 func (s *GeneratorOptionValidationSuite) TestReasoningOnNonReasoningModelReturnsErrorWhenStrict() {
-	cfg := model.ResolveGeneratorOpts(
-		model.WithModel("gpt-4.1-mini"),
-		model.WithReasoningLevel(model.ReasoningLevelLow),
-	)
-
 	_, err := normalizeGeneratorOptionsForModel(
-		model.ResolveLLMOpts(model.WithIgnoreInvalidGeneratorOptions(false)),
 		"gpt-4.1-mini",
-		cfg,
+		model.ResolveGeneratorOpts(
+			model.WithIgnoreInvalidGeneratorOptions(false),
+			model.WithModel("gpt-4.1-mini"),
+			model.WithReasoningLevel(model.ReasoningLevelLow),
+		),
 		nil,
 	)
 
@@ -52,15 +48,13 @@ func (s *GeneratorOptionValidationSuite) TestReasoningOnNonReasoningModelReturns
 }
 
 func (s *GeneratorOptionValidationSuite) TestTemperatureOnReasoningModelIsIgnoredWhenConfigured() {
-	cfg := model.ResolveGeneratorOpts(
-		model.WithModel("gpt-5-mini"),
-		model.WithTemperature(0.2),
-	)
-
 	normalized, err := normalizeGeneratorOptionsForModel(
-		model.ResolveLLMOpts(model.WithIgnoreInvalidGeneratorOptions(true)),
 		"gpt-5-mini",
-		cfg,
+		model.ResolveGeneratorOpts(
+			model.WithIgnoreInvalidGeneratorOptions(true),
+			model.WithModel("gpt-5-mini"),
+			model.WithTemperature(0.2),
+		),
 		nil,
 	)
 
@@ -69,15 +63,13 @@ func (s *GeneratorOptionValidationSuite) TestTemperatureOnReasoningModelIsIgnore
 }
 
 func (s *GeneratorOptionValidationSuite) TestReasoningOnNonReasoningModelIsIgnoredWhenConfigured() {
-	cfg := model.ResolveGeneratorOpts(
-		model.WithModel("gpt-4.1-mini"),
-		model.WithReasoningLevel(model.ReasoningLevelLow),
-	)
-
 	normalized, err := normalizeGeneratorOptionsForModel(
-		model.ResolveLLMOpts(model.WithIgnoreInvalidGeneratorOptions(true)),
 		"gpt-4.1-mini",
-		cfg,
+		model.ResolveGeneratorOpts(
+			model.WithIgnoreInvalidGeneratorOptions(true),
+			model.WithModel("gpt-4.1-mini"),
+			model.WithReasoningLevel(model.ReasoningLevelLow),
+		),
 		nil,
 	)
 

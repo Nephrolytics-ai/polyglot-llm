@@ -26,50 +26,48 @@ const (
 type toolHandler func(ctx context.Context, args json.RawMessage) (any, error)
 
 type client struct {
-	llmCfg    model.LLMConfig
 	apiClient openai.Client
 }
 
-func NewStructureContentGenerator[T any](prompt string, llmOpts []model.LLMOption, opts ...model.GeneratorOption) (model.ContentGenerator[T], error) {
+func NewStructureContentGenerator[T any](prompt string, opts ...model.GeneratorOption) (model.ContentGenerator[T], error) {
 	const fn = "openai_response.NewStructureContentGenerator"
 	if prompt == "" {
 		return nil, utils.WrapIfNotNil(errors.New("prompt is required"), fn)
 	}
 
 	cfg := model.ResolveGeneratorOpts(opts...)
-	c, err := newClient(llmOpts)
+	c, err := newClient(cfg)
 	if err != nil {
 		return nil, utils.WrapIfNotNil(err, fn)
 	}
 	return &structuredGenerator[T]{client: c, prompt: prompt, cfg: cfg}, nil
 }
 
-func NewStringContentGenerator(prompt string, llmOpts []model.LLMOption, opts ...model.GeneratorOption) (model.ContentGenerator[string], error) {
+func NewStringContentGenerator(prompt string, opts ...model.GeneratorOption) (model.ContentGenerator[string], error) {
 	const fn = "openai_response.NewStringContentGenerator"
 	if prompt == "" {
 		return nil, utils.WrapIfNotNil(errors.New("prompt is required"), fn)
 	}
 
 	cfg := model.ResolveGeneratorOpts(opts...)
-	c, err := newClient(llmOpts)
+	c, err := newClient(cfg)
 	if err != nil {
 		return nil, utils.WrapIfNotNil(err, fn)
 	}
 	return &textGenerator{client: c, prompt: prompt, cfg: cfg}, nil
 }
 
-func newClient(llmOpts []model.LLMOption) (*client, error) {
-	llmCfg := model.ResolveLLMOpts(llmOpts...)
+func newClient(cfg model.GeneratorConfig) (*client, error) {
 	requestOpts := make([]option.RequestOption, 0, 2)
-	if llmCfg.URL != "" {
-		requestOpts = append(requestOpts, option.WithBaseURL(llmCfg.URL))
+	if cfg.URL != "" {
+		requestOpts = append(requestOpts, option.WithBaseURL(cfg.URL))
 	}
-	if llmCfg.AuthToken != "" {
-		requestOpts = append(requestOpts, option.WithAPIKey(llmCfg.AuthToken))
+	if cfg.AuthToken != "" {
+		requestOpts = append(requestOpts, option.WithAPIKey(cfg.AuthToken))
 	}
 
 	apiClient := openai.NewClient(requestOpts...)
-	return &client{llmCfg: llmCfg, apiClient: apiClient}, nil
+	return &client{apiClient: apiClient}, nil
 }
 
 type structuredGenerator[T any] struct {
@@ -403,7 +401,7 @@ func (c *client) buildInitialParams(
 	log := logging.NewLogger(ctx)
 
 	modelName := resolveModelName(cfg)
-	cfg, err := normalizeGeneratorOptionsForModel(c.llmCfg, modelName, cfg, log)
+	cfg, err := normalizeGeneratorOptionsForModel(modelName, cfg, log)
 	if err != nil {
 		return responses.ResponseNewParams{}, nil, utils.WrapIfNotNil(err, fn)
 	}
@@ -449,7 +447,6 @@ func (c *client) buildInitialParams(
 }
 
 func normalizeGeneratorOptionsForModel(
-	llmCfg model.LLMConfig,
 	modelName string,
 	cfg model.GeneratorConfig,
 	log logging.Logger,
@@ -457,7 +454,7 @@ func normalizeGeneratorOptionsForModel(
 	reasoningModel := isReasoningModel(modelName)
 
 	if cfg.Temperature != nil && reasoningModel {
-		if llmCfg.IgnoreInvalidGeneratorOptions {
+		if cfg.IgnoreInvalidGeneratorOptions {
 			if log != nil {
 				log.Warnf("ignoring temperature for reasoning model %q", modelName)
 			}
@@ -470,7 +467,7 @@ func normalizeGeneratorOptionsForModel(
 	}
 
 	if cfg.ReasoningLevel != nil && !reasoningModel {
-		if llmCfg.IgnoreInvalidGeneratorOptions {
+		if cfg.IgnoreInvalidGeneratorOptions {
 			if log != nil {
 				log.Warnf("ignoring reasoning effort for non-reasoning model %q", modelName)
 			}

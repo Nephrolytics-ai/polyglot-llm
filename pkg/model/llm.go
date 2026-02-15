@@ -19,50 +19,6 @@ type PromptContextProvider interface {
 	GenerateContext(ctx context.Context) ([]*PromptContext, error)
 }
 
-type LLMOption interface {
-	apply(*LLMConfig)
-}
-
-type llmOptionFunc func(*LLMConfig)
-
-func (f llmOptionFunc) apply(cfg *LLMConfig) {
-	f(cfg)
-}
-
-type LLMConfig struct {
-	IgnoreInvalidGeneratorOptions bool
-	URL                           string
-	AuthToken                     string
-}
-
-func ResolveLLMOpts(opts ...LLMOption) LLMConfig {
-	cfg := LLMConfig{}
-	for _, opt := range opts {
-		if opt != nil {
-			opt.apply(&cfg)
-		}
-	}
-	return cfg
-}
-
-func WithIgnoreInvalidGeneratorOptions(value bool) LLMOption {
-	return llmOptionFunc(func(cfg *LLMConfig) {
-		cfg.IgnoreInvalidGeneratorOptions = value
-	})
-}
-
-func WithURL(value string) LLMOption {
-	return llmOptionFunc(func(cfg *LLMConfig) {
-		cfg.URL = value
-	})
-}
-
-func WithAuthToken(value string) LLMOption {
-	return llmOptionFunc(func(cfg *LLMConfig) {
-		cfg.AuthToken = value
-	})
-}
-
 type ContextMessageType string
 
 const (
@@ -88,12 +44,15 @@ func (f generatorOptionFunc) apply(cfg *GeneratorConfig) {
 type GeneratorOpts = GeneratorOption
 
 type GeneratorConfig struct {
-	Temperature    *float64
-	MaxTokens      *int
-	Model          *string
-	ReasoningLevel *ReasoningLevel
-	Tools          []Tool
-	MCPTools       []MCPTool
+	IgnoreInvalidGeneratorOptions bool
+	URL                           string
+	AuthToken                     string
+	Temperature                   *float64
+	MaxTokens                     *int
+	Model                         *string
+	ReasoningLevel                *ReasoningLevel
+	Tools                         []Tool
+	MCPTools                      []MCPTool
 }
 
 type ReasoningLevel string
@@ -132,6 +91,24 @@ func ResolveGeneratorOpts(opts ...GeneratorOption) GeneratorConfig {
 		}
 	}
 	return cfg
+}
+
+func WithIgnoreInvalidGeneratorOptions(value bool) GeneratorOption {
+	return generatorOptionFunc(func(cfg *GeneratorConfig) {
+		cfg.IgnoreInvalidGeneratorOptions = value
+	})
+}
+
+func WithURL(value string) GeneratorOption {
+	return generatorOptionFunc(func(cfg *GeneratorConfig) {
+		cfg.URL = value
+	})
+}
+
+func WithAuthToken(value string) GeneratorOption {
+	return generatorOptionFunc(func(cfg *GeneratorConfig) {
+		cfg.AuthToken = value
+	})
 }
 
 func WithTemperature(value float64) GeneratorOption {
