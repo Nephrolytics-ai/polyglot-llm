@@ -2,7 +2,6 @@ package mcp
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/utils"
@@ -11,28 +10,32 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-var cachedTools []string = nil
+var cachedToolsByURL = map[string][]string{}
 var cachedToolsMutex sync.RWMutex
 
 func FetchListOfTools(ctx context.Context, serverURL string, authToken string) ([]string, error) {
-
 	cachedToolsMutex.RLock()
-	tmpTools := cachedTools
+	tmpTools, found := cachedToolsByURL[serverURL]
 	cachedToolsMutex.RUnlock()
-	if tmpTools != nil {
-		return tmpTools, nil
+	if found {
+		return append([]string(nil), tmpTools...), nil
 	}
+
 	cachedToolsMutex.Lock()
 	defer cachedToolsMutex.Unlock()
-	if cachedTools != nil {
-		return cachedTools, nil
+
+	tmpTools, found = cachedToolsByURL[serverURL]
+	if found {
+		return append([]string(nil), tmpTools...), nil
 	}
+
 	tmpTools, err := actuallyFetchListOfTools(ctx, serverURL, authToken)
 	if err != nil {
 		return nil, err
 	}
-	cachedTools = tmpTools
-	return tmpTools, nil
+
+	cachedToolsByURL[serverURL] = append([]string(nil), tmpTools...)
+	return append([]string(nil), tmpTools...), nil
 }
 func actuallyFetchListOfTools(ctx context.Context, serverURL string, authToken string) ([]string, error) {
 
@@ -45,7 +48,6 @@ func actuallyFetchListOfTools(ctx context.Context, serverURL string, authToken s
 	defer c.Close()
 
 	// Initialize the client
-	fmt.Println("Initializing client...")
 	initRequest := mcp.InitializeRequest{}
 	initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
 

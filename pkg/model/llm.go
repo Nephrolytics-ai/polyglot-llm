@@ -5,6 +5,14 @@ import (
 	"encoding/json"
 )
 
+// These are factory methods each llm provider should implement to create content generators.
+
+// NewStructureContentGeneratorFunc is for generators that produce structured output (i.e. JSON that can be unmarshaled into a struct).
+type NewStructureContentGeneratorFunc[T any] func(prompt string, opts ...GeneratorOption) (ContentGenerator[T], error)
+
+// NewStringContentGeneratorFunc is for generators that produce simple string output.
+type NewStringContentGeneratorFunc func(prompt string, opts ...GeneratorOption) (ContentGenerator[string], error)
+
 type ContentGenerator[T any] interface {
 	Generate(ctx context.Context) (T, GenerationMetadata, error)
 	AddPromptContext(ctx context.Context, messageType ContextMessageType, content string)
