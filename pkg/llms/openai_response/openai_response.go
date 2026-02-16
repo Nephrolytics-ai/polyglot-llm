@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/logging"
+	"github.com/Nephrolytics-ai/polyglot-llm/pkg/mcp"
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/model"
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/utils"
 	"github.com/invopop/jsonschema"
@@ -451,7 +452,7 @@ func (c *client) buildInitialParams(
 		return responses.ResponseNewParams{}, nil, utils.WrapIfNotNil(err)
 	}
 
-	mcpTools, err := mapMCPTools(cfg.MCPTools)
+	mcpTools, err := mapMCPTools(ctx, cfg.MCPTools)
 	if err != nil {
 		return responses.ResponseNewParams{}, nil, utils.WrapIfNotNil(err)
 	}
@@ -692,7 +693,7 @@ func mapLocalTools(tools []model.Tool) ([]responses.ToolUnionParam, map[string]t
 	return responseTools, handlers, nil
 }
 
-func mapMCPTools(tools []model.MCPTool) ([]responses.ToolUnionParam, error) {
+func mapMCPTools(ctx context.Context, tools []model.MCPTool) ([]responses.ToolUnionParam, error) {
 	responseTools := make([]responses.ToolUnionParam, 0, len(tools))
 	for _, tool := range tools {
 		if tool.Name == "" {
@@ -702,21 +703,35 @@ func mapMCPTools(tools []model.MCPTool) ([]responses.ToolUnionParam, error) {
 			return nil, utils.WrapIfNotNil(fmt.Errorf("mcp tool URL is required for %q", tool.Name))
 		}
 
-		authorization, headers := extractAuthorization(tool.HTTPHeaders)
+		authorization := extractAuthorization(tool.HTTPHeaders)
+		allowedTools := append([]string(nil), tool.AllowedTools...)
+		if len(allowedTools) == 0 {
+			discoveredTools, err := mcp.FetchListOfTools(ctx, tool.URL, authorization)
+			if err != nil {
+				return nil, utils.WrapIfNotNil(
+					fmt.Errorf("discover mcp tools for %q failed: %w", tool.Name, err),
+				)
+			}
+			allowedTools = discoveredTools
+		}
 
 		param := responses.ToolMcpParam{
 			ServerLabel: tool.Name,
 			ServerURL:   openai.String(tool.URL),
+			Headers:     copyHeaders(tool.HTTPHeaders),
+			Type:        "mcp",
 		}
-		if authorization != "" {
-			param.Authorization = openai.String(authorization)
-		}
-		if len(headers) > 0 {
-			param.Headers = headers
-		}
-		if len(tool.AllowedTools) > 0 {
+		if len(allowedTools) > 0 {
 			param.AllowedTools = responses.ToolMcpAllowedToolsUnionParam{
-				OfMcpAllowedTools: append([]string(nil), tool.AllowedTools...),
+				OfMcpAllowedTools: append([]string(nil), allowedTools...),
+			}
+			param.RequireApproval = responses.ToolMcpRequireApprovalUnionParam{
+				OfMcpToolApprovalFilter: &responses.ToolMcpRequireApprovalMcpToolApprovalFilterParam{
+					Always: responses.ToolMcpRequireApprovalMcpToolApprovalFilterAlwaysParam{},
+					Never: responses.ToolMcpRequireApprovalMcpToolApprovalFilterNeverParam{
+						ToolNames: append([]string(nil), allowedTools...),
+					},
+				},
 			}
 		}
 
@@ -728,21 +743,30 @@ func mapMCPTools(tools []model.MCPTool) ([]responses.ToolUnionParam, error) {
 	return responseTools, nil
 }
 
-func extractAuthorization(headers map[string]string) (string, map[string]string) {
-	filtered := make(map[string]string, len(headers))
+func extractAuthorization(headers map[string]string) string {
+	if len(headers) == 0 {
+		return ""
+	}
+
 	authorization := ""
 	for k, v := range headers {
 		if strings.EqualFold(k, "Authorization") {
 			authorization = v
-			continue
 		}
-		filtered[k] = v
+	}
+	return authorization
+}
+
+func copyHeaders(headers map[string]string) map[string]string {
+	if len(headers) == 0 {
+		return nil
 	}
 
-	if len(filtered) == 0 {
-		return authorization, nil
+	copied := make(map[string]string, len(headers))
+	for k, v := range headers {
+		copied[k] = v
 	}
-	return authorization, filtered
+	return copied
 }
 
 func resolveModelName(cfg model.GeneratorConfig) string {

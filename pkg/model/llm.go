@@ -119,9 +119,10 @@ type Tool struct {
 }
 
 type MCPTool struct {
-	URL          string
-	Name         string
-	HTTPHeaders  map[string]string
+	URL         string
+	Name        string
+	HTTPHeaders map[string]string
+	// AllowedTools restricts exposed MCP tools. If omitted, all server tools are discovered and used.
 	AllowedTools []string
 }
 
