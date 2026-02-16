@@ -3,8 +3,10 @@ package anthopic
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/logging"
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/model"
@@ -65,13 +67,17 @@ func (g *structuredGenerator[T]) AddPromptContextProvider(ctx context.Context, p
 	)
 }
 
-func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, error) {
+func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, model.GenerationMetadata, error) {
+	start := time.Now()
+	meta := initMetadata(g.cfg)
+	defer setLatencyMetadata(meta, start)
+
 	log := logging.NewLogger(ctx)
 	prompt, contextCount, err := g.promptWithContext(ctx)
 	if err != nil {
 		log.Errorf("error: %v", err)
 		var zero T
-		return zero, utils.WrapIfNotNil(err)
+		return zero, meta, utils.WrapIfNotNil(err)
 	}
 	log.Infof(
 		"prompt=%q context_count=%d temperature=%v max_tokens=%v tools=%d url=%q auth_token_set=%t",
@@ -87,7 +93,7 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, error) {
 	var zero T
 	err = errors.New("anthopic structured generation not implemented")
 	log.Errorf("error: %v", err)
-	return zero, utils.WrapIfNotNil(err)
+	return zero, meta, utils.WrapIfNotNil(err)
 }
 
 type textGenerator struct {
@@ -124,12 +130,16 @@ func (g *textGenerator) AddPromptContextProvider(ctx context.Context, provider m
 	)
 }
 
-func (g *textGenerator) Generate(ctx context.Context) (string, error) {
+func (g *textGenerator) Generate(ctx context.Context) (string, model.GenerationMetadata, error) {
+	start := time.Now()
+	meta := initMetadata(g.cfg)
+	defer setLatencyMetadata(meta, start)
+
 	log := logging.NewLogger(ctx)
 	prompt, contextCount, err := g.promptWithContext(ctx)
 	if err != nil {
 		log.Errorf("error: %v", err)
-		return "", utils.WrapIfNotNil(err)
+		return "", meta, utils.WrapIfNotNil(err)
 	}
 	log.Infof(
 		"prompt=%q context_count=%d temperature=%v max_tokens=%v tools=%d url=%q auth_token_set=%t",
@@ -144,7 +154,31 @@ func (g *textGenerator) Generate(ctx context.Context) (string, error) {
 
 	err = errors.New("anthopic text generation not implemented")
 	log.Errorf("error: %v", err)
-	return "", utils.WrapIfNotNil(err)
+	return "", meta, utils.WrapIfNotNil(err)
+}
+
+func initMetadata(cfg model.GeneratorConfig) model.GenerationMetadata {
+	modelName := strings.TrimSpace(resolveModelName(cfg))
+	if modelName == "" {
+		modelName = "unknown"
+	}
+
+	meta := model.GenerationMetadata{
+		model.MetadataKeyProvider: "anthopic",
+		model.MetadataKeyModel:    modelName,
+	}
+	return meta
+}
+
+func setLatencyMetadata(meta model.GenerationMetadata, start time.Time) {
+	meta[model.MetadataKeyLatencyMs] = strconv.FormatInt(time.Since(start).Milliseconds(), 10)
+}
+
+func resolveModelName(cfg model.GeneratorConfig) string {
+	if cfg.Model == nil {
+		return ""
+	}
+	return *cfg.Model
 }
 
 func (g *structuredGenerator[T]) promptWithContext(ctx context.Context) (string, int, error) {

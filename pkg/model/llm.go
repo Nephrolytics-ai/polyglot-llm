@@ -6,10 +6,27 @@ import (
 )
 
 type ContentGenerator[T any] interface {
-	Generate(ctx context.Context) (T, error)
+	Generate(ctx context.Context) (T, GenerationMetadata, error)
 	AddPromptContext(ctx context.Context, messageType ContextMessageType, content string)
 	AddPromptContextProvider(ctx context.Context, provider PromptContextProvider)
 }
+
+type GenerationMetadata map[string]string
+
+const (
+	MetadataKeyProvider          = "provider"
+	MetadataKeyModel             = "model"
+	MetadataKeyLatencyMs         = "latency_ms"
+	MetadataKeyInputTokens       = "input_tokens"
+	MetadataKeyOutputTokens      = "output_tokens"
+	MetadataKeyTotalTokens       = "total_tokens"
+	MetadataKeyCachedInputTokens = "cached_input_tokens"
+	MetadataKeyReasoningTokens   = "reasoning_tokens"
+	MetadataKeyAPICalls          = "api_calls"
+	MetadataKeyToolRounds        = "tool_rounds"
+	MetadataKeyResponseID        = "response_id"
+	MetadataKeyResponseStatus    = "response_status"
+)
 
 type PromptContext struct {
 	MessageType ContextMessageType

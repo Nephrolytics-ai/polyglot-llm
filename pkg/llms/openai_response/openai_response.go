@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/logging"
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/model"
@@ -21,9 +23,20 @@ import (
 const (
 	defaultModelName = "gpt-5-mini"
 	maxToolRounds    = 12
+	providerName     = "openai_response"
 )
 
 type toolHandler func(ctx context.Context, args json.RawMessage) (any, error)
+
+type flowUsageTotals struct {
+	APICalls          int
+	ToolRounds        int
+	InputTokens       int64
+	OutputTokens      int64
+	TotalTokens       int64
+	CachedInputTokens int64
+	ReasoningTokens   int64
+}
 
 type client struct {
 	apiClient openai.Client
@@ -106,13 +119,17 @@ func (g *structuredGenerator[T]) AddPromptContextProvider(ctx context.Context, p
 	)
 }
 
-func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, error) {
+func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, model.GenerationMetadata, error) {
+	start := time.Now()
+	meta := initMetadata(providerName, resolveModelName(g.cfg))
+	defer setLatencyMetadata(meta, start)
+
 	log := logging.NewLogger(ctx)
 	inputItems, contextCount, err := g.inputItemsWithContext(ctx)
 	if err != nil {
 		log.Errorf("error: %v", err)
 		var zero T
-		return zero, utils.WrapIfNotNil(err)
+		return zero, meta, utils.WrapIfNotNil(err)
 	}
 	log.Infof(
 		"prompt=%q context_count=%d input_items=%d model=%v temperature=%v max_tokens=%v reasoning=%v tools=%d mcp_tools=%d",
@@ -131,7 +148,7 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, error) {
 	if err != nil {
 		log.Errorf("error: %v", err)
 		var zero T
-		return zero, utils.WrapIfNotNil(err)
+		return zero, meta, utils.WrapIfNotNil(err)
 	}
 
 	textCfg := responses.ResponseTextConfigParam{
@@ -144,7 +161,7 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, error) {
 		},
 	}
 
-	response, err := g.client.runResponsesFlow(
+	response, totals, err := g.client.runResponsesFlow(
 		ctx,
 		responses.ResponseNewParamsInputUnion{
 			OfInputItemList: inputItems,
@@ -155,15 +172,16 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, error) {
 	if err != nil {
 		log.Errorf("error: %v", err)
 		var zero T
-		return zero, utils.WrapIfNotNil(err)
+		return zero, meta, utils.WrapIfNotNil(err)
 	}
+	applyOpenAIResponseMetadata(meta, response, totals)
 
 	output := strings.TrimSpace(response.OutputText())
 	if output == "" {
 		err = errors.New("response output is empty")
 		log.Errorf("error: %v", err)
 		var zero T
-		return zero, utils.WrapIfNotNil(err)
+		return zero, meta, utils.WrapIfNotNil(err)
 	}
 
 	var result T
@@ -171,10 +189,10 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, error) {
 	if err != nil {
 		log.Errorf("error: %v", err)
 		var zero T
-		return zero, utils.WrapIfNotNil(err)
+		return zero, meta, utils.WrapIfNotNil(err)
 	}
 
-	return result, nil
+	return result, meta, nil
 }
 
 type textGenerator struct {
@@ -215,12 +233,16 @@ func (g *textGenerator) AddPromptContextProvider(ctx context.Context, provider m
 	)
 }
 
-func (g *textGenerator) Generate(ctx context.Context) (string, error) {
+func (g *textGenerator) Generate(ctx context.Context) (string, model.GenerationMetadata, error) {
+	start := time.Now()
+	meta := initMetadata(providerName, resolveModelName(g.cfg))
+	defer setLatencyMetadata(meta, start)
+
 	log := logging.NewLogger(ctx)
 	inputItems, contextCount, err := g.inputItemsWithContext(ctx)
 	if err != nil {
 		log.Errorf("error: %v", err)
-		return "", utils.WrapIfNotNil(err)
+		return "", meta, utils.WrapIfNotNil(err)
 	}
 	log.Infof(
 		"prompt=%q context_count=%d input_items=%d model=%v temperature=%v max_tokens=%v reasoning=%v tools=%d mcp_tools=%d",
@@ -235,7 +257,7 @@ func (g *textGenerator) Generate(ctx context.Context) (string, error) {
 		len(g.cfg.MCPTools),
 	)
 
-	response, err := g.client.runResponsesFlow(
+	response, totals, err := g.client.runResponsesFlow(
 		ctx,
 		responses.ResponseNewParamsInputUnion{
 			OfInputItemList: inputItems,
@@ -245,10 +267,11 @@ func (g *textGenerator) Generate(ctx context.Context) (string, error) {
 	)
 	if err != nil {
 		log.Errorf("error: %v", err)
-		return "", utils.WrapIfNotNil(err)
+		return "", meta, utils.WrapIfNotNil(err)
 	}
+	applyOpenAIResponseMetadata(meta, response, totals)
 
-	return response.OutputText(), nil
+	return response.OutputText(), meta, nil
 }
 
 func (g *structuredGenerator[T]) inputItemsWithContext(ctx context.Context) (responses.ResponseInputParam, int, error) {
@@ -323,41 +346,44 @@ func (c *client) runResponsesFlow(
 	input responses.ResponseNewParamsInputUnion,
 	cfg model.GeneratorConfig,
 	textCfg *responses.ResponseTextConfigParam,
-) (*responses.Response, error) {
+) (*responses.Response, flowUsageTotals, error) {
 	log := logging.NewLogger(ctx)
+	totals := flowUsageTotals{}
 
 	initialParams, handlers, err := c.buildInitialParams(ctx, input, cfg, textCfg)
 	if err != nil {
-		return nil, utils.WrapIfNotNil(err)
+		return nil, totals, utils.WrapIfNotNil(err)
 	}
 	history, err := seedInputHistory(initialParams.Input)
 	if err != nil {
-		return nil, utils.WrapIfNotNil(err)
+		return nil, totals, utils.WrapIfNotNil(err)
 	}
 
 	response, err := c.apiClient.Responses.New(ctx, initialParams)
 	if err != nil {
 		log.Errorf("error: %v", err)
-		return nil, utils.WrapIfNotNil(err)
+		return nil, totals, utils.WrapIfNotNil(err)
 	}
 	if response == nil {
 		err = errors.New("responses API returned nil response")
 		log.Errorf("error: %v", err)
-		return nil, utils.WrapIfNotNil(err)
+		return nil, totals, utils.WrapIfNotNil(err)
 	}
+	accumulateFlowUsage(&totals, response)
 
 	for round := 0; round < maxToolRounds; round++ {
 		priorItems, err := responseOutputToInputItems(response.Output)
 		if err != nil {
 			log.Errorf("error: %v", err)
-			return nil, utils.WrapIfNotNil(err)
+			return nil, totals, utils.WrapIfNotNil(err)
 		}
 		history = append(history, priorItems...)
 
 		calls := extractFunctionCalls(response)
 		if len(calls) == 0 {
-			return response, nil
+			return response, totals, nil
 		}
+		totals.ToolRounds = round + 1
 
 		log.Infof("tool_round=%d function_calls=%d history_items=%d", round+1, len(calls), len(history))
 		outputItems := make([]responses.ResponseInputItemUnionParam, 0, len(calls))
@@ -367,19 +393,19 @@ func (c *client) runResponsesFlow(
 			if !ok {
 				err = fmt.Errorf("no tool handler configured for function %q", call.Name)
 				log.Errorf("error: %v", err)
-				return nil, utils.WrapIfNotNil(err)
+				return nil, totals, utils.WrapIfNotNil(err)
 			}
 
 			result, callErr := handler(ctx, json.RawMessage(call.Arguments))
 			if callErr != nil {
 				log.Errorf("error: %v", callErr)
-				return nil, utils.WrapIfNotNil(callErr)
+				return nil, totals, utils.WrapIfNotNil(callErr)
 			}
 
 			outputJSON, marshalErr := json.Marshal(result)
 			if marshalErr != nil {
 				log.Errorf("error: %v", marshalErr)
-				return nil, utils.WrapIfNotNil(marshalErr)
+				return nil, totals, utils.WrapIfNotNil(marshalErr)
 			}
 
 			outputItems = append(outputItems, responses.ResponseInputItemParamOfFunctionCallOutput(call.CallID, string(outputJSON)))
@@ -390,18 +416,19 @@ func (c *client) runResponsesFlow(
 		response, err = c.apiClient.Responses.New(ctx, nextParams)
 		if err != nil {
 			log.Errorf("error: %v", err)
-			return nil, utils.WrapIfNotNil(err)
+			return nil, totals, utils.WrapIfNotNil(err)
 		}
 		if response == nil {
 			err = errors.New("responses API returned nil follow-up response")
 			log.Errorf("error: %v", err)
-			return nil, utils.WrapIfNotNil(err)
+			return nil, totals, utils.WrapIfNotNil(err)
 		}
+		accumulateFlowUsage(&totals, response)
 	}
 
 	err = fmt.Errorf("exceeded tool call loop limit (%d)", maxToolRounds)
 	log.Errorf("error: %v", err)
-	return nil, utils.WrapIfNotNil(err)
+	return nil, totals, utils.WrapIfNotNil(err)
 }
 
 func (c *client) buildInitialParams(
@@ -471,6 +498,60 @@ func mapContextMessageRole(messageType model.ContextMessageType) responses.EasyI
 	default:
 		return responses.EasyInputMessageRoleUser
 	}
+}
+
+func initMetadata(provider string, modelName string) model.GenerationMetadata {
+	if strings.TrimSpace(modelName) == "" {
+		modelName = "unknown"
+	}
+
+	meta := model.GenerationMetadata{
+		model.MetadataKeyProvider: provider,
+		model.MetadataKeyModel:    modelName,
+	}
+	return meta
+}
+
+func setLatencyMetadata(meta model.GenerationMetadata, start time.Time) {
+	if meta == nil {
+		return
+	}
+	meta[model.MetadataKeyLatencyMs] = strconv.FormatInt(time.Since(start).Milliseconds(), 10)
+}
+
+func applyOpenAIResponseMetadata(meta model.GenerationMetadata, response *responses.Response, totals flowUsageTotals) {
+	if meta == nil {
+		return
+	}
+
+	meta[model.MetadataKeyAPICalls] = strconv.Itoa(totals.APICalls)
+	meta[model.MetadataKeyToolRounds] = strconv.Itoa(totals.ToolRounds)
+	meta[model.MetadataKeyInputTokens] = strconv.FormatInt(totals.InputTokens, 10)
+	meta[model.MetadataKeyOutputTokens] = strconv.FormatInt(totals.OutputTokens, 10)
+	meta[model.MetadataKeyTotalTokens] = strconv.FormatInt(totals.TotalTokens, 10)
+	meta[model.MetadataKeyCachedInputTokens] = strconv.FormatInt(totals.CachedInputTokens, 10)
+	meta[model.MetadataKeyReasoningTokens] = strconv.FormatInt(totals.ReasoningTokens, 10)
+	if response != nil {
+		if response.ID != "" {
+			meta[model.MetadataKeyResponseID] = response.ID
+		}
+		if response.Status != "" {
+			meta[model.MetadataKeyResponseStatus] = string(response.Status)
+		}
+	}
+}
+
+func accumulateFlowUsage(totals *flowUsageTotals, response *responses.Response) {
+	if totals == nil || response == nil {
+		return
+	}
+
+	totals.APICalls++
+	totals.InputTokens += response.Usage.InputTokens
+	totals.OutputTokens += response.Usage.OutputTokens
+	totals.TotalTokens += response.Usage.TotalTokens
+	totals.CachedInputTokens += response.Usage.InputTokensDetails.CachedTokens
+	totals.ReasoningTokens += response.Usage.OutputTokensDetails.ReasoningTokens
 }
 
 func normalizeGeneratorOptionsForModel(

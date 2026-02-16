@@ -68,9 +68,11 @@ func (s *OpenAIResponsesIntegrationSuite) TestCreateGeneratorAndGenerate() {
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), generator)
 
-	output, err := generator.Generate(ctx)
+	output, metadata, err := generator.Generate(ctx)
 	require.NoError(s.T(), err)
 	assert.NotEmpty(s.T(), strings.TrimSpace(output))
+	assert.NotEmpty(s.T(), metadata[model.MetadataKeyProvider])
+	assert.NotEmpty(s.T(), metadata[model.MetadataKeyLatencyMs])
 }
 
 func (s *OpenAIResponsesIntegrationSuite) TestCreateStructuredGeneratorAndGenerate() {
@@ -97,10 +99,12 @@ func (s *OpenAIResponsesIntegrationSuite) TestCreateStructuredGeneratorAndGenera
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), generator)
 
-	output, err := generator.Generate(ctx)
+	output, metadata, err := generator.Generate(ctx)
 	require.NoError(s.T(), err)
 	assert.NotEmpty(s.T(), strings.TrimSpace(output.Status))
 	assert.NotEmpty(s.T(), strings.TrimSpace(output.Message))
+	assert.NotEmpty(s.T(), metadata[model.MetadataKeyProvider])
+	assert.NotEmpty(s.T(), metadata[model.MetadataKeyLatencyMs])
 }
 
 func (s *OpenAIResponsesIntegrationSuite) TestCreateGeneratorAndGenerateWithTool() {
@@ -149,10 +153,12 @@ func (s *OpenAIResponsesIntegrationSuite) TestCreateGeneratorAndGenerateWithTool
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), generator)
 
-	output, err := generator.Generate(ctx)
+	output, metadata, err := generator.Generate(ctx)
 	require.NoError(s.T(), err)
 	assert.GreaterOrEqual(s.T(), toolCalls.Load(), int32(1))
 	assert.Equal(s.T(), toolSecret, strings.TrimSpace(output.Secret))
+	assert.NotEmpty(s.T(), metadata[model.MetadataKeyProvider])
+	assert.NotEmpty(s.T(), metadata[model.MetadataKeyLatencyMs])
 }
 
 func TestOpenAIResponsesIntegrationSuite(t *testing.T) {
