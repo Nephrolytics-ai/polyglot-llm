@@ -31,18 +31,15 @@ Add a test to the test/* directory to implement an integration test for structur
 Use the google.golang.org/genai for the Gemini implementation
 
 
-Now we are going to make the bedrock implementation. 
-Since Bedrock does not support MCP nativly, use the tools adapter under the hood to implement the MCP functionality.  
+Now we are going to make the Ollama implementation. 
+Since Ollama API  does not support MCP nativly, use the tools adapter under the hood to implement the MCP functionality.  
 Implement both the Generator Interface and the Factory functions for Typed and String generation.
-Add a test to the test/* directory to implement an integration test for structure and string generation 
-Use the github.com/aws/aws-sdk-go-v2/service/bedrockruntime for the Bedrock implementation
-For Authentication, I want you to use 1 of two items.  First Look to see if the AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables are set, if they are use those to authenticate.  
-If not then look for an AWS_PROFILE environment variable, and use that profile to authenticate.
-Also, look for AWS_REGION environment variable to set the region for the client, if not set default to us-east-1.
-
-Add needed infrastructure to the github workflow to set the env from the secrets.
-For the workflows look for aws secrets named DEV_AWS_ACCESS_KEY_ID, DEV_AWS_REGION,DEV_AWS_SECRET_ACCESS_KEY for AWS_ACCESS_KEY_ID, AWS_REGION and AWS_SECRET_ACCESS_KEY respectively.
-For the tests, use this bedrock model us.anthropic.claude-3-5-sonnet-20241022-v2:0
+Also implement the Vector generation interface and factory function as well, using the Ollama embedding API.
+Add a test to the test/* directory to implement an integration test for structure and string generation and vector generation, single and batch generation
+PUT a flag around this keyed of the boolean RUN_OLLAMA_TESTS so that it only runs when we want it to run, since it requires a local Ollama instance to be running with the correct models loaded.  Our integration does not have this yet
+Use the https://pkg.go.dev/github.com/rozoomcool/go-ollama-sdk for the Ollama implementation
+I dont think there is authentication for Ollama, if there is, let me know.
+We wont include Ollama tests in the github workflow.
 
 
 

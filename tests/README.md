@@ -12,3 +12,4 @@ Tests here should remain deterministic where possible and skip clearly when requ
 Current credential variable conventions:
 - `OPEN_API_TOKEN` for OpenAI-backed tests
 - `GEMINI_KEY` for Gemini-backed tests
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional `AWS_REGION` for Bedrock-backed tests (or `AWS_PROFILE`)
