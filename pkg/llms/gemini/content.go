@@ -146,8 +146,20 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, model.Generat
 		var zero T
 		return zero, meta, utils.WrapIfNotNil(err)
 	}
-	config.ResponseMIMEType = "application/json"
-	config.ResponseJsonSchema = schema
+	if len(genTools) == 0 {
+		config.ResponseMIMEType = "application/json"
+		config.ResponseJsonSchema = schema
+	} else {
+		// Gemini does not support response MIME type/json schema mode when function calling is enabled.
+		// Enforce structured output via prompt instructions instead.
+		instruction, buildErr := buildStructuredOutputInstruction(schema)
+		if buildErr != nil {
+			log.Errorf("error: %v", buildErr)
+			var zero T
+			return zero, meta, utils.WrapIfNotNil(buildErr)
+		}
+		contents = append(contents, genai.NewContentFromText(instruction, genai.RoleUser))
+	}
 
 	client, err := newAPIClient(ctx, g.cfg)
 	if err != nil {
@@ -185,7 +197,7 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, model.Generat
 	}
 
 	var out T
-	err = json.Unmarshal([]byte(text), &out)
+	err = json.Unmarshal([]byte(extractJSONPayload(text)), &out)
 	if err != nil {
 		log.Errorf("error: %v", err)
 		var zero T
@@ -532,4 +544,28 @@ func generateJSONSchema[T any]() (map[string]any, error) {
 	}
 
 	return schemaMap, nil
+}
+
+func buildStructuredOutputInstruction(schema map[string]any) (string, error) {
+	schemaBytes, err := json.Marshal(schema)
+	if err != nil {
+		return "", utils.WrapIfNotNil(err)
+	}
+
+	return "Return ONLY valid JSON matching this schema. Do not include markdown fences.\n" + string(schemaBytes), nil
+}
+
+func extractJSONPayload(text string) string {
+	trimmed := strings.TrimSpace(text)
+	trimmed = strings.TrimPrefix(trimmed, "```json")
+	trimmed = strings.TrimPrefix(trimmed, "```")
+	trimmed = strings.TrimSuffix(trimmed, "```")
+	trimmed = strings.TrimSpace(trimmed)
+
+	start := strings.Index(trimmed, "{")
+	end := strings.LastIndex(trimmed, "}")
+	if start >= 0 && end > start {
+		return strings.TrimSpace(trimmed[start : end+1])
+	}
+	return trimmed
 }
