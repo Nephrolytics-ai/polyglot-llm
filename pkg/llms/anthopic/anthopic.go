@@ -16,19 +16,17 @@ type Client[T any] struct {
 }
 
 func NewStructureContentGenerator[T any](prompt string, opts ...model.GeneratorOption) (model.ContentGenerator[T], error) {
-	const fn = "anthopic.NewStructureContentGenerator"
 	cfg := model.ResolveGeneratorOpts(opts...)
 	if prompt == "" {
-		return nil, utils.WrapIfNotNil(errors.New("prompt is required"), fn)
+		return nil, utils.WrapIfNotNil(errors.New("prompt is required"))
 	}
 	return &structuredGenerator[T]{prompt: prompt, cfg: cfg}, nil
 }
 
 func NewStringContentGenerator(prompt string, opts ...model.GeneratorOption) (model.ContentGenerator[string], error) {
-	const fn = "anthopic.NewStringContentGenerator"
 	cfg := model.ResolveGeneratorOpts(opts...)
 	if prompt == "" {
-		return nil, utils.WrapIfNotNil(errors.New("prompt is required"), fn)
+		return nil, utils.WrapIfNotNil(errors.New("prompt is required"))
 	}
 	return &textGenerator{prompt: prompt, cfg: cfg}, nil
 }
@@ -68,17 +66,15 @@ func (g *structuredGenerator[T]) AddPromptContextProvider(ctx context.Context, p
 }
 
 func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, error) {
-	const fn = "anthopic.structuredGenerator.Generate"
 	log := logging.NewLogger(ctx)
 	prompt, contextCount, err := g.promptWithContext(ctx)
 	if err != nil {
-		log.Errorf("%s error: %v", fn, err)
+		log.Errorf("error: %v", err)
 		var zero T
-		return zero, utils.WrapIfNotNil(err, fn)
+		return zero, utils.WrapIfNotNil(err)
 	}
 	log.Infof(
-		"%s prompt=%q context_count=%d temperature=%v max_tokens=%v tools=%d url=%q auth_token_set=%t",
-		fn,
+		"prompt=%q context_count=%d temperature=%v max_tokens=%v tools=%d url=%q auth_token_set=%t",
 		prompt,
 		contextCount,
 		g.cfg.Temperature,
@@ -90,7 +86,7 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, error) {
 
 	var zero T
 	err = errors.New("anthopic structured generation not implemented")
-	log.Errorf("%s error: %v", fn, err)
+	log.Errorf("error: %v", err)
 	return zero, utils.WrapIfNotNil(err)
 }
 
@@ -129,16 +125,14 @@ func (g *textGenerator) AddPromptContextProvider(ctx context.Context, provider m
 }
 
 func (g *textGenerator) Generate(ctx context.Context) (string, error) {
-	const fn = "anthopic.textGenerator.Generate"
 	log := logging.NewLogger(ctx)
 	prompt, contextCount, err := g.promptWithContext(ctx)
 	if err != nil {
-		log.Errorf("%s error: %v", fn, err)
-		return "", utils.WrapIfNotNil(err, fn)
+		log.Errorf("error: %v", err)
+		return "", utils.WrapIfNotNil(err)
 	}
 	log.Infof(
-		"%s prompt=%q context_count=%d temperature=%v max_tokens=%v tools=%d url=%q auth_token_set=%t",
-		fn,
+		"prompt=%q context_count=%d temperature=%v max_tokens=%v tools=%d url=%q auth_token_set=%t",
 		prompt,
 		contextCount,
 		g.cfg.Temperature,
@@ -149,12 +143,11 @@ func (g *textGenerator) Generate(ctx context.Context) (string, error) {
 	)
 
 	err = errors.New("anthopic text generation not implemented")
-	log.Errorf("%s error: %v", fn, err)
+	log.Errorf("error: %v", err)
 	return "", utils.WrapIfNotNil(err)
 }
 
 func (g *structuredGenerator[T]) promptWithContext(ctx context.Context) (string, int, error) {
-	const fn = "anthopic.structuredGenerator.promptWithContext"
 	g.promptContextMu.RLock()
 	contexts := append([]*model.PromptContext(nil), g.promptContexts...)
 	providers := append([]model.PromptContextProvider(nil), g.promptContextProviders...)
@@ -163,7 +156,7 @@ func (g *structuredGenerator[T]) promptWithContext(ctx context.Context) (string,
 	for _, provider := range providers {
 		provided, err := provider.GenerateContext(ctx)
 		if err != nil {
-			return "", 0, utils.WrapIfNotNil(err, fn)
+			return "", 0, utils.WrapIfNotNil(err)
 		}
 		contexts = append(contexts, provided...)
 	}
@@ -172,7 +165,6 @@ func (g *structuredGenerator[T]) promptWithContext(ctx context.Context) (string,
 }
 
 func (g *textGenerator) promptWithContext(ctx context.Context) (string, int, error) {
-	const fn = "anthopic.textGenerator.promptWithContext"
 	g.promptContextMu.RLock()
 	contexts := append([]*model.PromptContext(nil), g.promptContexts...)
 	providers := append([]model.PromptContextProvider(nil), g.promptContextProviders...)
@@ -181,7 +173,7 @@ func (g *textGenerator) promptWithContext(ctx context.Context) (string, int, err
 	for _, provider := range providers {
 		provided, err := provider.GenerateContext(ctx)
 		if err != nil {
-			return "", 0, utils.WrapIfNotNil(err, fn)
+			return "", 0, utils.WrapIfNotNil(err)
 		}
 		contexts = append(contexts, provided...)
 	}

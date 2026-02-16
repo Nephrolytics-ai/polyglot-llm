@@ -30,29 +30,27 @@ type client struct {
 }
 
 func NewStructureContentGenerator[T any](prompt string, opts ...model.GeneratorOption) (model.ContentGenerator[T], error) {
-	const fn = "openai_response.NewStructureContentGenerator"
 	if prompt == "" {
-		return nil, utils.WrapIfNotNil(errors.New("prompt is required"), fn)
+		return nil, utils.WrapIfNotNil(errors.New("prompt is required"))
 	}
 
 	cfg := model.ResolveGeneratorOpts(opts...)
 	c, err := newClient(cfg)
 	if err != nil {
-		return nil, utils.WrapIfNotNil(err, fn)
+		return nil, utils.WrapIfNotNil(err)
 	}
 	return &structuredGenerator[T]{client: c, prompt: prompt, cfg: cfg}, nil
 }
 
 func NewStringContentGenerator(prompt string, opts ...model.GeneratorOption) (model.ContentGenerator[string], error) {
-	const fn = "openai_response.NewStringContentGenerator"
 	if prompt == "" {
-		return nil, utils.WrapIfNotNil(errors.New("prompt is required"), fn)
+		return nil, utils.WrapIfNotNil(errors.New("prompt is required"))
 	}
 
 	cfg := model.ResolveGeneratorOpts(opts...)
 	c, err := newClient(cfg)
 	if err != nil {
-		return nil, utils.WrapIfNotNil(err, fn)
+		return nil, utils.WrapIfNotNil(err)
 	}
 	return &textGenerator{client: c, prompt: prompt, cfg: cfg}, nil
 }
@@ -109,19 +107,18 @@ func (g *structuredGenerator[T]) AddPromptContextProvider(ctx context.Context, p
 }
 
 func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, error) {
-	const fn = "openai_response.structuredGenerator.Generate"
 	log := logging.NewLogger(ctx)
-	prompt, contextCount, err := g.promptWithContext(ctx)
+	inputItems, contextCount, err := g.inputItemsWithContext(ctx)
 	if err != nil {
-		log.Errorf("%s error: %v", fn, err)
+		log.Errorf("error: %v", err)
 		var zero T
-		return zero, utils.WrapIfNotNil(err, fn)
+		return zero, utils.WrapIfNotNil(err)
 	}
 	log.Infof(
-		"%s prompt=%q context_count=%d model=%v temperature=%v max_tokens=%v reasoning=%v tools=%d mcp_tools=%d",
-		fn,
-		prompt,
+		"prompt=%q context_count=%d input_items=%d model=%v temperature=%v max_tokens=%v reasoning=%v tools=%d mcp_tools=%d",
+		g.prompt,
 		contextCount,
+		len(inputItems),
 		g.cfg.Model,
 		g.cfg.Temperature,
 		g.cfg.MaxTokens,
@@ -132,7 +129,7 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, error) {
 
 	schema, err := generateSchema[T]()
 	if err != nil {
-		log.Errorf("%s error: %v", fn, err)
+		log.Errorf("error: %v", err)
 		var zero T
 		return zero, utils.WrapIfNotNil(err)
 	}
@@ -147,9 +144,16 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, error) {
 		},
 	}
 
-	response, err := g.client.runResponsesFlow(ctx, prompt, g.cfg, &textCfg)
+	response, err := g.client.runResponsesFlow(
+		ctx,
+		responses.ResponseNewParamsInputUnion{
+			OfInputItemList: inputItems,
+		},
+		g.cfg,
+		&textCfg,
+	)
 	if err != nil {
-		log.Errorf("%s error: %v", fn, err)
+		log.Errorf("error: %v", err)
 		var zero T
 		return zero, utils.WrapIfNotNil(err)
 	}
@@ -157,7 +161,7 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, error) {
 	output := strings.TrimSpace(response.OutputText())
 	if output == "" {
 		err = errors.New("response output is empty")
-		log.Errorf("%s error: %v", fn, err)
+		log.Errorf("error: %v", err)
 		var zero T
 		return zero, utils.WrapIfNotNil(err)
 	}
@@ -165,7 +169,7 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, error) {
 	var result T
 	err = json.Unmarshal([]byte(output), &result)
 	if err != nil {
-		log.Errorf("%s error: %v", fn, err)
+		log.Errorf("error: %v", err)
 		var zero T
 		return zero, utils.WrapIfNotNil(err)
 	}
@@ -212,18 +216,17 @@ func (g *textGenerator) AddPromptContextProvider(ctx context.Context, provider m
 }
 
 func (g *textGenerator) Generate(ctx context.Context) (string, error) {
-	const fn = "openai_response.textGenerator.Generate"
 	log := logging.NewLogger(ctx)
-	prompt, contextCount, err := g.promptWithContext(ctx)
+	inputItems, contextCount, err := g.inputItemsWithContext(ctx)
 	if err != nil {
-		log.Errorf("%s error: %v", fn, err)
-		return "", utils.WrapIfNotNil(err, fn)
+		log.Errorf("error: %v", err)
+		return "", utils.WrapIfNotNil(err)
 	}
 	log.Infof(
-		"%s prompt=%q context_count=%d model=%v temperature=%v max_tokens=%v reasoning=%v tools=%d mcp_tools=%d",
-		fn,
-		prompt,
+		"prompt=%q context_count=%d input_items=%d model=%v temperature=%v max_tokens=%v reasoning=%v tools=%d mcp_tools=%d",
+		g.prompt,
 		contextCount,
+		len(inputItems),
 		g.cfg.Model,
 		g.cfg.Temperature,
 		g.cfg.MaxTokens,
@@ -232,17 +235,23 @@ func (g *textGenerator) Generate(ctx context.Context) (string, error) {
 		len(g.cfg.MCPTools),
 	)
 
-	response, err := g.client.runResponsesFlow(ctx, prompt, g.cfg, nil)
+	response, err := g.client.runResponsesFlow(
+		ctx,
+		responses.ResponseNewParamsInputUnion{
+			OfInputItemList: inputItems,
+		},
+		g.cfg,
+		nil,
+	)
 	if err != nil {
-		log.Errorf("%s error: %v", fn, err)
+		log.Errorf("error: %v", err)
 		return "", utils.WrapIfNotNil(err)
 	}
 
 	return response.OutputText(), nil
 }
 
-func (g *structuredGenerator[T]) promptWithContext(ctx context.Context) (string, int, error) {
-	const fn = "openai_response.structuredGenerator.promptWithContext"
+func (g *structuredGenerator[T]) inputItemsWithContext(ctx context.Context) (responses.ResponseInputParam, int, error) {
 	g.promptContextMu.RLock()
 	contexts := append([]*model.PromptContext(nil), g.promptContexts...)
 	providers := append([]model.PromptContextProvider(nil), g.promptContextProviders...)
@@ -251,16 +260,15 @@ func (g *structuredGenerator[T]) promptWithContext(ctx context.Context) (string,
 	for _, provider := range providers {
 		provided, err := provider.GenerateContext(ctx)
 		if err != nil {
-			return "", 0, utils.WrapIfNotNil(err, fn)
+			return nil, 0, utils.WrapIfNotNil(err)
 		}
 		contexts = append(contexts, provided...)
 	}
 
-	return buildPromptWithContext(g.prompt, contexts)
+	return buildInputItemsWithContext(g.prompt, contexts)
 }
 
-func (g *textGenerator) promptWithContext(ctx context.Context) (string, int, error) {
-	const fn = "openai_response.textGenerator.promptWithContext"
+func (g *textGenerator) inputItemsWithContext(ctx context.Context) (responses.ResponseInputParam, int, error) {
 	g.promptContextMu.RLock()
 	contexts := append([]*model.PromptContext(nil), g.promptContexts...)
 	providers := append([]model.PromptContextProvider(nil), g.promptContextProviders...)
@@ -269,20 +277,16 @@ func (g *textGenerator) promptWithContext(ctx context.Context) (string, int, err
 	for _, provider := range providers {
 		provided, err := provider.GenerateContext(ctx)
 		if err != nil {
-			return "", 0, utils.WrapIfNotNil(err, fn)
+			return nil, 0, utils.WrapIfNotNil(err)
 		}
 		contexts = append(contexts, provided...)
 	}
 
-	return buildPromptWithContext(g.prompt, contexts)
+	return buildInputItemsWithContext(g.prompt, contexts)
 }
 
-func buildPromptWithContext(prompt string, contexts []*model.PromptContext) (string, int, error) {
-	if len(contexts) == 0 {
-		return prompt, 0, nil
-	}
-
-	var b strings.Builder
+func buildInputItemsWithContext(prompt string, contexts []*model.PromptContext) (responses.ResponseInputParam, int, error) {
+	items := make(responses.ResponseInputParam, 0, len(contexts)+1)
 	contextCount := 0
 	for _, contextItem := range contexts {
 		if contextItem == nil {
@@ -294,116 +298,125 @@ func buildPromptWithContext(prompt string, contexts []*model.PromptContext) (str
 			continue
 		}
 
-		messageType := strings.TrimSpace(string(contextItem.MessageType))
-		if messageType == "" {
-			messageType = string(model.ContextMessageTypeHuman)
-		}
-
 		contextCount++
-		b.WriteString("[")
-		b.WriteString(messageType)
-		b.WriteString("]\n")
-		b.WriteString(content)
-		b.WriteString("\n\n")
+		items = append(
+			items,
+			responses.ResponseInputItemParamOfMessage(
+				content,
+				mapContextMessageRole(contextItem.MessageType),
+			),
+		)
 	}
 
-	if contextCount == 0 {
-		return prompt, 0, nil
-	}
-
-	b.WriteString("[prompt]\n")
-	b.WriteString(prompt)
-	return b.String(), contextCount, nil
+	items = append(
+		items,
+		responses.ResponseInputItemParamOfMessage(
+			prompt,
+			responses.EasyInputMessageRoleUser,
+		),
+	)
+	return items, contextCount, nil
 }
 
 func (c *client) runResponsesFlow(
 	ctx context.Context,
-	prompt string,
+	input responses.ResponseNewParamsInputUnion,
 	cfg model.GeneratorConfig,
 	textCfg *responses.ResponseTextConfigParam,
 ) (*responses.Response, error) {
-	const fn = "openai_response.Client.runResponsesFlow"
 	log := logging.NewLogger(ctx)
 
-	initialParams, handlers, err := c.buildInitialParams(ctx, prompt, cfg, textCfg)
+	initialParams, handlers, err := c.buildInitialParams(ctx, input, cfg, textCfg)
+	if err != nil {
+		return nil, utils.WrapIfNotNil(err)
+	}
+	history, err := seedInputHistory(initialParams.Input)
 	if err != nil {
 		return nil, utils.WrapIfNotNil(err)
 	}
 
 	response, err := c.apiClient.Responses.New(ctx, initialParams)
 	if err != nil {
-		log.Errorf("%s error: %v", fn, err)
+		log.Errorf("error: %v", err)
 		return nil, utils.WrapIfNotNil(err)
 	}
 	if response == nil {
 		err = errors.New("responses API returned nil response")
-		log.Errorf("%s error: %v", fn, err)
+		log.Errorf("error: %v", err)
 		return nil, utils.WrapIfNotNil(err)
 	}
 
 	for round := 0; round < maxToolRounds; round++ {
+		priorItems, err := responseOutputToInputItems(response.Output)
+		if err != nil {
+			log.Errorf("error: %v", err)
+			return nil, utils.WrapIfNotNil(err)
+		}
+		history = append(history, priorItems...)
+
 		calls := extractFunctionCalls(response)
 		if len(calls) == 0 {
 			return response, nil
 		}
 
-		log.Infof("%s tool_round=%d function_calls=%d", fn, round+1, len(calls))
+		log.Infof("tool_round=%d function_calls=%d history_items=%d", round+1, len(calls), len(history))
 		outputItems := make([]responses.ResponseInputItemUnionParam, 0, len(calls))
 
 		for _, call := range calls {
 			handler, ok := handlers[call.Name]
 			if !ok {
 				err = fmt.Errorf("no tool handler configured for function %q", call.Name)
-				log.Errorf("%s error: %v", fn, err)
+				log.Errorf("error: %v", err)
 				return nil, utils.WrapIfNotNil(err)
 			}
 
 			result, callErr := handler(ctx, json.RawMessage(call.Arguments))
 			if callErr != nil {
-				log.Errorf("%s error: %v", fn, callErr)
+				log.Errorf("error: %v", callErr)
 				return nil, utils.WrapIfNotNil(callErr)
 			}
 
 			outputJSON, marshalErr := json.Marshal(result)
 			if marshalErr != nil {
-				log.Errorf("%s error: %v", fn, marshalErr)
+				log.Errorf("error: %v", marshalErr)
 				return nil, utils.WrapIfNotNil(marshalErr)
 			}
 
 			outputItems = append(outputItems, responses.ResponseInputItemParamOfFunctionCallOutput(call.CallID, string(outputJSON)))
 		}
 
-		nextParams := buildFollowupParams(initialParams, response.ID, outputItems, textCfg)
+		history = append(history, outputItems...)
+		nextParams := buildStatelessFollowupParams(initialParams, history, textCfg)
 		response, err = c.apiClient.Responses.New(ctx, nextParams)
 		if err != nil {
-			log.Errorf("%s error: %v", fn, err)
+			log.Errorf("error: %v", err)
 			return nil, utils.WrapIfNotNil(err)
 		}
 		if response == nil {
 			err = errors.New("responses API returned nil follow-up response")
-			log.Errorf("%s error: %v", fn, err)
+			log.Errorf("error: %v", err)
 			return nil, utils.WrapIfNotNil(err)
 		}
 	}
 
 	err = fmt.Errorf("exceeded tool call loop limit (%d)", maxToolRounds)
-	log.Errorf("%s error: %v", fn, err)
+	log.Errorf("error: %v", err)
 	return nil, utils.WrapIfNotNil(err)
 }
 
 func (c *client) buildInitialParams(
 	ctx context.Context,
-	prompt string,
+	input responses.ResponseNewParamsInputUnion,
 	cfg model.GeneratorConfig,
 	textCfg *responses.ResponseTextConfigParam,
 ) (responses.ResponseNewParams, map[string]toolHandler, error) {
-	const fn = "openai_response.Client.buildInitialParams"
 	log := logging.NewLogger(ctx)
 
 	modelName := resolveModelName(cfg)
+	reasoningModel := isReasoningModel(modelName)
 	cfg, err := normalizeGeneratorOptionsForModel(modelName, cfg, log)
 	if err != nil {
-		return responses.ResponseNewParams{}, nil, utils.WrapIfNotNil(err, fn)
+		return responses.ResponseNewParams{}, nil, utils.WrapIfNotNil(err)
 	}
 
 	tools, handlers, err := mapLocalTools(cfg.Tools)
@@ -421,11 +434,12 @@ func (c *client) buildInitialParams(
 	allTools = append(allTools, mcpTools...)
 
 	params := responses.ResponseNewParams{
-		Input: responses.ResponseNewParamsInputUnion{
-			OfString: openai.String(prompt),
-		},
+		Input: input,
 		Model: shared.ResponsesModel(modelName),
 		Tools: allTools,
+	}
+	if reasoningModel {
+		params.Include = append(params.Include, responses.ResponseIncludableReasoningEncryptedContent)
 	}
 
 	if cfg.Temperature != nil {
@@ -444,6 +458,19 @@ func (c *client) buildInitialParams(
 	}
 
 	return params, handlers, nil
+}
+
+func mapContextMessageRole(messageType model.ContextMessageType) responses.EasyInputMessageRole {
+	switch messageType {
+	case model.ContextMessageTypeSystem:
+		return responses.EasyInputMessageRoleSystem
+	case model.ContextMessageTypeAssistant:
+		return responses.EasyInputMessageRoleAssistant
+	case model.ContextMessageTypeHuman:
+		return responses.EasyInputMessageRoleUser
+	default:
+		return responses.EasyInputMessageRoleUser
+	}
 }
 
 func normalizeGeneratorOptionsForModel(
@@ -494,21 +521,20 @@ func isReasoningModel(modelName string) bool {
 		strings.HasPrefix(name, "gpt-5")
 }
 
-func buildFollowupParams(
+func buildStatelessFollowupParams(
 	initial responses.ResponseNewParams,
-	previousResponseID string,
-	outputItems []responses.ResponseInputItemUnionParam,
+	history responses.ResponseInputParam,
 	textCfg *responses.ResponseTextConfigParam,
 ) responses.ResponseNewParams {
 	followup := responses.ResponseNewParams{
-		Model:              initial.Model,
-		Temperature:        initial.Temperature,
-		MaxOutputTokens:    initial.MaxOutputTokens,
-		Reasoning:          initial.Reasoning,
-		Tools:              initial.Tools,
-		PreviousResponseID: openai.String(previousResponseID),
+		Model:           initial.Model,
+		Temperature:     initial.Temperature,
+		MaxOutputTokens: initial.MaxOutputTokens,
+		Reasoning:       initial.Reasoning,
+		Tools:           initial.Tools,
+		Include:         append([]responses.ResponseIncludable(nil), initial.Include...),
 		Input: responses.ResponseNewParamsInputUnion{
-			OfInputItemList: outputItems,
+			OfInputItemList: append(responses.ResponseInputParam(nil), history...),
 		},
 	}
 
@@ -519,21 +545,44 @@ func buildFollowupParams(
 	return followup
 }
 
-func mapLocalTools(tools []model.Tool) ([]responses.ToolUnionParam, map[string]toolHandler, error) {
-	const fn = "openai_response.mapLocalTools"
+func seedInputHistory(input responses.ResponseNewParamsInputUnion) (responses.ResponseInputParam, error) {
+	if len(input.OfInputItemList) > 0 {
+		return append(responses.ResponseInputParam(nil), input.OfInputItemList...), nil
+	}
+	if input.OfString.Valid() {
+		return responses.ResponseInputParam{
+			responses.ResponseInputItemParamOfMessage(input.OfString.Value, responses.EasyInputMessageRoleUser),
+		}, nil
+	}
+	return nil, utils.WrapIfNotNil(errors.New("response input is empty"))
+}
 
+func responseOutputToInputItems(output []responses.ResponseOutputItemUnion) (responses.ResponseInputParam, error) {
+	items := make(responses.ResponseInputParam, 0, len(output))
+	for _, outputItem := range output {
+		var inputItem responses.ResponseInputItemUnion
+		err := json.Unmarshal([]byte(outputItem.RawJSON()), &inputItem)
+		if err != nil {
+			return nil, utils.WrapIfNotNil(err)
+		}
+		items = append(items, inputItem.ToParam())
+	}
+	return items, nil
+}
+
+func mapLocalTools(tools []model.Tool) ([]responses.ToolUnionParam, map[string]toolHandler, error) {
 	responseTools := make([]responses.ToolUnionParam, 0, len(tools))
 	handlers := make(map[string]toolHandler, len(tools))
 
 	for _, tool := range tools {
 		if tool.Name == "" {
-			return nil, nil, utils.WrapIfNotNil(errors.New("tool name is required"), fn)
+			return nil, nil, utils.WrapIfNotNil(errors.New("tool name is required"))
 		}
 		if tool.Handler == nil {
-			return nil, nil, utils.WrapIfNotNil(fmt.Errorf("tool handler is required for %q", tool.Name), fn)
+			return nil, nil, utils.WrapIfNotNil(fmt.Errorf("tool handler is required for %q", tool.Name))
 		}
 		if _, exists := handlers[tool.Name]; exists {
-			return nil, nil, utils.WrapIfNotNil(fmt.Errorf("duplicate tool name %q", tool.Name), fn)
+			return nil, nil, utils.WrapIfNotNil(fmt.Errorf("duplicate tool name %q", tool.Name))
 		}
 
 		parameters := map[string]any{
@@ -563,15 +612,13 @@ func mapLocalTools(tools []model.Tool) ([]responses.ToolUnionParam, map[string]t
 }
 
 func mapMCPTools(tools []model.MCPTool) ([]responses.ToolUnionParam, error) {
-	const fn = "openai_response.mapMCPTools"
-
 	responseTools := make([]responses.ToolUnionParam, 0, len(tools))
 	for _, tool := range tools {
 		if tool.Name == "" {
-			return nil, utils.WrapIfNotNil(errors.New("mcp tool name is required"), fn)
+			return nil, utils.WrapIfNotNil(errors.New("mcp tool name is required"))
 		}
 		if tool.URL == "" {
-			return nil, utils.WrapIfNotNil(fmt.Errorf("mcp tool URL is required for %q", tool.Name), fn)
+			return nil, utils.WrapIfNotNil(fmt.Errorf("mcp tool URL is required for %q", tool.Name))
 		}
 
 		authorization, headers := extractAuthorization(tool.HTTPHeaders)
@@ -664,8 +711,6 @@ func extractFunctionCalls(response *responses.Response) []responses.ResponseFunc
 }
 
 func generateSchema[T any]() (map[string]any, error) {
-	const fn = "openai_response.generateSchema"
-
 	reflector := jsonschema.Reflector{
 		AllowAdditionalProperties: false,
 		DoNotReference:            true,
@@ -676,13 +721,13 @@ func generateSchema[T any]() (map[string]any, error) {
 
 	schemaJSON, err := json.Marshal(schema)
 	if err != nil {
-		return nil, utils.WrapIfNotNil(err, fn)
+		return nil, utils.WrapIfNotNil(err)
 	}
 
 	var schemaMap map[string]any
 	err = json.Unmarshal(schemaJSON, &schemaMap)
 	if err != nil {
-		return nil, utils.WrapIfNotNil(err, fn)
+		return nil, utils.WrapIfNotNil(err)
 	}
 
 	return schemaMap, nil

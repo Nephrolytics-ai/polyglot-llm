@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/model"
+	"github.com/openai/openai-go/v3/responses"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -77,8 +78,8 @@ func (s *GeneratorOptionValidationSuite) TestReasoningOnNonReasoningModelIsIgnor
 	s.Assert().Nil(normalized.ReasoningLevel)
 }
 
-func (s *GeneratorOptionValidationSuite) TestBuildPromptWithContextIncludesPromptContexts() {
-	result, contextCount, err := buildPromptWithContext("final prompt", []*model.PromptContext{
+func (s *GeneratorOptionValidationSuite) TestBuildInputItemsWithContextIncludesPromptContexts() {
+	items, contextCount, err := buildInputItemsWithContext("final prompt", []*model.PromptContext{
 		{
 			MessageType: model.ContextMessageTypeSystem,
 			Content:     "system content",
@@ -91,24 +92,26 @@ func (s *GeneratorOptionValidationSuite) TestBuildPromptWithContextIncludesPromp
 
 	s.Require().NoError(err)
 	s.Assert().Equal(2, contextCount)
-	s.Assert().Contains(result, "[system]\nsystem content")
-	s.Assert().Contains(result, "[human]\nrag content")
-	s.Assert().Contains(result, "[prompt]\nfinal prompt")
+	s.Require().Len(items, 3)
+	assertMessageItem(s, items[0], responses.EasyInputMessageRoleSystem, "system content")
+	assertMessageItem(s, items[1], responses.EasyInputMessageRoleUser, "rag content")
+	assertMessageItem(s, items[2], responses.EasyInputMessageRoleUser, "final prompt")
 }
 
-func (s *GeneratorOptionValidationSuite) TestAddPromptContextIsUsedByGeneratorPromptBuilder() {
+func (s *GeneratorOptionValidationSuite) TestAddPromptContextIsUsedByGeneratorInputBuilder() {
 	g := &textGenerator{prompt: "main prompt"}
 	g.AddPromptContext(context.Background(), model.ContextMessageTypeSystem, "be concise")
 
-	prompt, contextCount, err := g.promptWithContext(context.Background())
+	items, contextCount, err := g.inputItemsWithContext(context.Background())
 
 	s.Require().NoError(err)
 	s.Assert().Equal(1, contextCount)
-	s.Assert().Contains(prompt, "[system]\nbe concise")
-	s.Assert().Contains(prompt, "[prompt]\nmain prompt")
+	s.Require().Len(items, 2)
+	assertMessageItem(s, items[0], responses.EasyInputMessageRoleSystem, "be concise")
+	assertMessageItem(s, items[1], responses.EasyInputMessageRoleUser, "main prompt")
 }
 
-func (s *GeneratorOptionValidationSuite) TestAddPromptContextProviderIsCalledDuringPromptBuild() {
+func (s *GeneratorOptionValidationSuite) TestAddPromptContextProviderIsCalledDuringInputBuild() {
 	provider := &stubPromptContextProvider{
 		contexts: []*model.PromptContext{
 			{
@@ -121,16 +124,17 @@ func (s *GeneratorOptionValidationSuite) TestAddPromptContextProviderIsCalledDur
 	g := &textGenerator{prompt: "main prompt"}
 	g.AddPromptContextProvider(context.Background(), provider)
 
-	prompt, contextCount, err := g.promptWithContext(context.Background())
+	items, contextCount, err := g.inputItemsWithContext(context.Background())
 
 	s.Require().NoError(err)
 	s.Assert().Equal(1, provider.calls)
 	s.Assert().Equal(1, contextCount)
-	s.Assert().Contains(prompt, "[human]\nprovider rag content")
-	s.Assert().Contains(prompt, "[prompt]\nmain prompt")
+	s.Require().Len(items, 2)
+	assertMessageItem(s, items[0], responses.EasyInputMessageRoleUser, "provider rag content")
+	assertMessageItem(s, items[1], responses.EasyInputMessageRoleUser, "main prompt")
 }
 
-func (s *GeneratorOptionValidationSuite) TestPromptBuildReturnsProviderError() {
+func (s *GeneratorOptionValidationSuite) TestInputBuildReturnsProviderError() {
 	provider := &stubPromptContextProvider{
 		err: errors.New("provider failed"),
 	}
@@ -138,10 +142,17 @@ func (s *GeneratorOptionValidationSuite) TestPromptBuildReturnsProviderError() {
 	g := &textGenerator{prompt: "main prompt"}
 	g.AddPromptContextProvider(context.Background(), provider)
 
-	_, _, err := g.promptWithContext(context.Background())
+	_, _, err := g.inputItemsWithContext(context.Background())
 
 	s.Require().Error(err)
 	s.Assert().Contains(err.Error(), "provider failed")
+}
+
+func (s *GeneratorOptionValidationSuite) TestMapContextMessageRole() {
+	s.Assert().Equal(responses.EasyInputMessageRoleSystem, mapContextMessageRole(model.ContextMessageTypeSystem))
+	s.Assert().Equal(responses.EasyInputMessageRoleAssistant, mapContextMessageRole(model.ContextMessageTypeAssistant))
+	s.Assert().Equal(responses.EasyInputMessageRoleUser, mapContextMessageRole(model.ContextMessageTypeHuman))
+	s.Assert().Equal(responses.EasyInputMessageRoleUser, mapContextMessageRole(model.ContextMessageType("unknown")))
 }
 
 type stubPromptContextProvider struct {
@@ -156,4 +167,10 @@ func (s *stubPromptContextProvider) GenerateContext(ctx context.Context) ([]*mod
 		return nil, s.err
 	}
 	return s.contexts, nil
+}
+
+func assertMessageItem(s *GeneratorOptionValidationSuite, item responses.ResponseInputItemUnionParam, expectedRole responses.EasyInputMessageRole, expectedContent string) {
+	s.Require().NotNil(item.OfMessage)
+	s.Assert().Equal(expectedRole, item.OfMessage.Role)
+	s.Assert().Equal(expectedContent, item.OfMessage.Content.OfString.Value)
 }
