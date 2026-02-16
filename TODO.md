@@ -16,3 +16,8 @@ I want some common meta data to be included in all implementations, such as:
 Add someway to return meta data with the responses. (Tokens, in/out/cached,latency etc...)
 Define some common meta data and then let each implementation add to it as needed.
 Make it a second return value from the Generate method
+
+
+Review the test settings and standardize on using OPEN_API_TOKEN and GEMINI_KEY for settings.
+Make a github workflow that runs the makefile targets to build unit tests and the integration tests, and make sure to set the appropriate secrets for the tests to run in the workflow.
+The secrets are the same names.

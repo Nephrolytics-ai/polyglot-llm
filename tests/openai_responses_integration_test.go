@@ -34,13 +34,10 @@ type toolStructuredResponse struct {
 func (s *OpenAIResponsesIntegrationSuite) SetupSuite() {
 	s.ExternalDependenciesSuite.SetupSuite()
 
-	s.apiKey = strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
-	if s.apiKey == "" {
-		s.apiKey = strings.TrimSpace(os.Getenv("OPEN_API_TOKEN"))
-	}
+	s.apiKey = strings.TrimSpace(os.Getenv("OPEN_API_TOKEN"))
 	s.baseURL = strings.TrimSpace(os.Getenv("OPENAI_BASE_URL"))
 	if s.apiKey == "" {
-		s.T().Skip("OPENAI_API_KEY/OPEN_API_TOKEN is not set; skipping external dependency integration test")
+		s.T().Skip("OPEN_API_TOKEN is not set; skipping external dependency integration test")
 	}
 }
 
