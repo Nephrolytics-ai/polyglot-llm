@@ -2,71 +2,79 @@
 
 ## Goals
 
-- Provide a single abstraction for text and structured generation across providers.
-- Keep provider integrations isolated in `pkg/llms/*`.
+- Keep a single provider-agnostic abstraction for content generation and embeddings.
+- Keep provider implementations isolated under `pkg/llms/*`.
 - Support local tools and MCP tools.
-- Support prompt context enrichment (static context + runtime providers).
-- Return standardized generation metadata from every provider.
-- Avoid `panic`/`fatal`; all failures return wrapped errors.
+- Support prompt context accumulation from static messages and runtime providers.
+- Return normalized metadata for observability.
+- Return wrapped errors; never use `panic` or `fatal`.
 
-## Package Layout
+## Base Abstraction Layer (`pkg/model/llm.go`)
 
-- `pkg/model/llm.go`
-  - Core interfaces and shared types.
-  - Option model (`GeneratorOption`) and resolved config (`GeneratorConfig`).
-  - Tool and MCP tool models.
-  - Metadata model (`GenerationMetadata`) and common keys.
-- `pkg/llms/openai_response`
-  - OpenAI Responses API implementation (current full implementation).
-- `pkg/llms/anthopic`
-  - Stub implementation, same interface and metadata contract.
-- `pkg/llms/gemini`
-  - Stub implementation, same interface and metadata contract.
-- `pkg/logging`
-  - Logging abstraction and factory support.
-- `pkg/utils/errorutils.go`
-  - Error wrapping and utility helpers.
+This is the contract layer all providers implement.
 
-## Core Abstraction
+### Factory Function Types
 
-`ContentGenerator[T]` is the provider-agnostic interface:
+- `NewStructureContentGeneratorFunc[T any]`
+- `NewStringContentGeneratorFunc`
+- `NewEmbeddingGeneratorFunc`
+- `NewBatchEmbeddingGeneratorFunc`
 
-- `Generate(ctx context.Context) (T, GenerationMetadata, error)`
-- `AddPromptContext(ctx context.Context, messageType ContextMessageType, content string)`
-- `AddPromptContextProvider(ctx context.Context, provider PromptContextProvider)`
+### Core Interfaces
+
+- `ContentGenerator[T]`
+  - `Generate(ctx context.Context) (T, GenerationMetadata, error)`
+  - `AddPromptContext(ctx context.Context, messageType ContextMessageType, content string)`
+  - `AddPromptContextProvider(ctx context.Context, provider PromptContextProvider)`
+- `EmbeddingGenerator`
+  - `Generate(ctx context.Context) (EmbeddingVector, GenerationMetadata, error)`
+  - `GenerateBatch(ctx context.Context) (EmbeddingVectors, GenerationMetadata, error)`
 
 ### Prompt Context Model
 
 - `PromptContext` has:
   - `MessageType` (`system`, `human`, `assistant`)
   - `Content`
-- `PromptContextProvider` generates context at runtime:
-  - `GenerateContext(ctx) ([]*PromptContext, error)`
+- `PromptContextProvider`:
+  - `GenerateContext(ctx context.Context) ([]*PromptContext, error)`
 
-At generation time, implementations merge:
-- static contexts added via `AddPromptContext`
-- dynamic contexts returned by registered providers
+Each generator merges:
+- static context from `AddPromptContext`
+- dynamic context from `AddPromptContextProvider`
 
-## Unified Options Model
+### Unified Options Model
 
-One options set is used for both provider-level and generation-level settings:
+All options are `GeneratorOption` and resolve into `GeneratorConfig`:
 
-- `WithAuthToken(string)`
-- `WithURL(string)`
 - `WithIgnoreInvalidGeneratorOptions(bool)`
-- `WithModel(string)`
+- `WithURL(string)`
+- `WithAuthToken(string)`
 - `WithTemperature(float64)`
 - `WithMaxTokens(int)`
-- `WithReasoningLevel(ReasoningLevel)`
+- `WithEmbeddingDimensions(int)`
+- `WithModel(string)`
+- `WithReasoningLevel(ReasoningLevel)` where level is `none|low|med|high`
 - `WithTools([]Tool)`
 - `WithMCPTools([]MCPTool)`
 
-## Metadata Contract
+### Tools and MCP Tools
+
+- `Tool`
+  - `Name`
+  - `Description`
+  - `InputSchema` (`JSONSchema`)
+  - `Handler func(ctx context.Context, args json.RawMessage) (any, error)`
+- `MCPTool`
+  - `URL`
+  - `Name`
+  - `HTTPHeaders`
+  - `AllowedTools`
+
+### Metadata Contract
 
 `GenerationMetadata` is `map[string]string`.
 
-Common keys are defined in `pkg/model/llm.go`:
-
+Common keys:
 - `provider`
 - `model`
 - `latency_ms`
@@ -79,112 +87,70 @@ Common keys are defined in `pkg/model/llm.go`:
 - `tool_rounds`
 - `response_id`
 - `response_status`
+- `embedding_count`
+- `embedding_dims`
 
-Providers can add more keys, but common keys should remain stable.
+Providers may add additional keys, but these should remain stable.
 
-## OpenAI Responses Implementation
+## Provider Matrix
 
-## Construction
+| Provider | Package | Structured/String Generation | Embeddings | Auth | URL Configuration | Internal APIs Used | MCP Support Mode |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| OpenAI Responses | `pkg/llms/openai_response` | Yes | Yes | `WithAuthToken`; if omitted, `openai-go` can read `OPENAI_API_KEY` | `WithURL` -> OpenAI client base URL | `openai-go/v3`: `Responses.New`, `Embeddings.New` | Native MCP via OpenAI Responses MCP tool type |
+| Gemini | `pkg/llms/gemini` | Yes | Yes | `WithAuthToken` or env `GEMINI_KEY` | `WithURL` -> `genai.HTTPOptions.BaseURL` | `google.golang.org/genai`: `Models.GenerateContent`, `Models.EmbedContent` | Uses MCP Tool Adapter (`pkg/mcp`) to bridge MCP into normal tool calls |
+| Bedrock | `pkg/llms/bedrock` | Yes | No | Env only: `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` (optional `AWS_SESSION_TOKEN`) OR `AWS_PROFILE`; region from `AWS_REGION` (default `us-east-1`) | `WithURL` -> Bedrock `BaseEndpoint` override | `aws-sdk-go-v2/service/bedrockruntime`: `Converse` | Uses MCP Tool Adapter (`pkg/mcp`) to bridge MCP into normal tool calls |
+| Ollama | `pkg/llms/ollama` | Yes | Yes | None required | `WithURL`, else `OLLAMA_BASE_URL`, else `http://localhost:11434` | Native HTTP `/api/chat` (including tool loop), `/api/embed` with fallback `/api/embeddings` | Uses MCP Tool Adapter (`pkg/mcp`) to bridge MCP into normal tool calls |
+| Anthopic (scaffold) | `pkg/llms/anthopic` | Constructors exist; `Generate` currently returns not-implemented errors | No | Not implemented | Not implemented | Not implemented | Not implemented |
 
-- `NewStringContentGenerator(prompt, opts...)`
-- `NewStructureContentGenerator[T](prompt, opts...)`
+## OpenAI Responses Details
 
-Both:
-- validate prompt is non-empty
-- resolve options into `GeneratorConfig`
-- build an OpenAI client using `URL` and `AuthToken`
+- Uses structured input items (`ResponseInputItem`) with explicit message roles.
+- Supports local tools (`function`) and native OpenAI MCP tools in the same request.
+- Implements a stateless tool loop:
+  - appends prior model output items into local input history
+  - executes tool calls locally
+  - appends `function_call_output` items
+  - resubmits full history each round
+- Does not rely on `previous_response_id`, which keeps it compatible with Zero Data Retention org restrictions.
+- Structured generation uses strict JSON schema from `invopop/jsonschema`.
+- Applies reasoning/temperature compatibility checks by model family, with optional ignore behavior via `WithIgnoreInvalidGeneratorOptions(true)`.
 
-## Input Construction
+## Gemini Details
 
-OpenAI uses structured input items (`OfInputItemList`), not concatenated prompt strings.
+- Uses `genai.Client` with `BackendGeminiAPI`.
+- Supports:
+  - string generation
+  - structured generation (schema-mode when no tools; prompt-enforced JSON when tools are enabled)
+  - single and batch embeddings
+- Function calling is enabled via Gemini function declarations and tool config.
+- MCP tools are converted to local tools through `pkg/mcp.ToolAdapter`.
+- Includes fallback logic for models that reject explicit thinking level.
 
-`ContextMessageType` mapping:
-- `System` -> `system`
-- `Human` -> `user`
-- `Assistant` -> `assistant`
+## Bedrock Details
 
-The main prompt is always appended as a `user` message item.
+- Uses Bedrock `Converse` API for generation.
+- Supports local tools through Bedrock `ToolConfiguration`.
+- MCP tools are converted into local tools through `pkg/mcp.ToolAdapter`.
+- Supports `WithTemperature` and `WithMaxTokens` mapping into Bedrock inference config.
+- Embeddings are not implemented in this provider yet.
 
-## Tooling
+## Ollama Details
 
-### Local tools
+- Uses native `/api/chat` request/response handling for both normal generation and tool rounds.
+- Maintains assistant/tool context history in-process for multi-round tool calling.
+- Accepts native `tool_calls` from the model and executes mapped handlers.
+- Handles model-side tool name prefixes (for example `tool.<name>`) when resolving handlers.
+- Embeddings use `/api/embed`; fallback to `/api/embeddings` for older Ollama servers.
+- MCP tools are converted into local tools through `pkg/mcp.ToolAdapter`.
 
-`model.Tool` maps to OpenAI function tools:
-- `Name`, optional `Description`
-- JSON schema parameters from `InputSchema`
-- local handler function invoked during tool rounds
+## MCP Tool Adapter (`pkg/mcp`)
 
-### MCP tools
+Providers that do not support MCP natively (Gemini, Bedrock, Ollama) use `ToolAdapter`:
 
-`model.MCPTool` maps to OpenAI MCP tools:
-- `Name` -> `server_label`
-- `URL` -> `server_url`
-- `AllowedTools` -> `allowed_tools`
-- `HTTPHeaders["Authorization"]` mapped to MCP authorization field
-- remaining headers passed through as MCP headers
+- Connect to MCP server via streamable HTTP transport.
+- Initialize and list tools.
+- Convert MCP tool definitions into `model.Tool` entries.
+- Execute MCP tool calls through adapter handlers.
+- Optional allow-list filtering via `AllowedTools`.
 
-## Stateless Tool Loop (Zero Data Retention Compatible)
-
-The OpenAI flow is intentionally stateless and does **not** use `previous_response_id`.
-
-Execution loop:
-
-1. Submit initial request with message input and tool definitions.
-2. Convert response output items into reusable input items and append to local history.
-3. If function calls exist:
-   - execute local handlers
-   - append `function_call_output` items to local history
-   - resend request with full history as `OfInputItemList`
-4. Repeat until no more function calls or max rounds reached.
-
-This supports organizations with Zero Data Retention constraints.
-
-## Reasoning + Option Validation
-
-Model validation rules:
-- If model is reasoning-capable and temperature is set:
-  - error unless `IgnoreInvalidGeneratorOptions=true`, then drop temperature.
-- If model is non-reasoning and reasoning effort is set:
-  - error unless `IgnoreInvalidGeneratorOptions=true`, then drop reasoning effort.
-
-Reasoning model heuristic currently treats these prefixes as reasoning:
-- `o1`, `o3`, `o4`, `gpt-5`
-
-For reasoning models, the request includes:
-- `include: reasoning.encrypted_content`
-
-This allows reasoning state to be carried in stateless chaining.
-
-## Structured Output Path
-
-For `NewStructureContentGenerator[T]`:
-
-- Generates JSON schema for `T` via `invopop/jsonschema`.
-- Sends schema through `responses.ResponseTextConfigParam` with strict mode.
-- Parses `response.OutputText()` JSON into `T`.
-
-## Metadata Population (OpenAI)
-
-Each `Generate` call returns metadata containing:
-- base keys (`provider`, `model`, `latency_ms`)
-- aggregated usage over all API calls in the run:
-  - input/output/total tokens
-  - cached input tokens
-  - reasoning tokens
-  - API call count
-  - tool round count
-- final response identifiers:
-  - response ID
-  - response status
-
-## Error Handling and Logging
-
-- All errors are returned, never fatal/panic.
-- Errors are wrapped with `utils.WrapIfNotNil(...)`.
-- Logging goes through `pkg/logging.NewLogger(ctx)`.
-
-## Known Tradeoffs / Future Work
-
-- Stateless history can grow quickly (cost + context-window pressure).
-- No automatic truncation/compaction strategy is implemented yet.
-- Anthopic and Gemini providers currently keep interface compatibility but are stubs.
+The tool-name cache helper in `pkg/mcp/tools.go` caches per MCP URL.
