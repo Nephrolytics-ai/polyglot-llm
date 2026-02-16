@@ -1,12 +1,12 @@
 .PHONY: test test-unit test-external
 
 GO ?= go
-GOCACHE_DIR ?= /tmp/go-build-cache
+GOFLAGS ?= -mod=vendor
 
 test-unit:
-	GOCACHE=$(GOCACHE_DIR) $(GO) test ./pkg/...
+	GOFLAGS="$(GOFLAGS)" $(GO) test ./pkg/...
 
 test-external:
-	GOCACHE=$(GOCACHE_DIR) $(GO) test ./tests/...
+	GOFLAGS="$(GOFLAGS)" $(GO) test ./tests/...
 
 test: test-unit test-external
