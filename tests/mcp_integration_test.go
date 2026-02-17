@@ -123,8 +123,8 @@ func (s *MCPIntegrationSuite) TestGeminiWithMCPTool() {
 	opts := []model.GeneratorOption{
 		model.WithAuthToken(s.geminiKey),
 		model.WithModel("gemini-2.5-flash"),
-		model.WithReasoningLevel(model.ReasoningLevelLow),
-		model.WithMaxTokens(512),
+		model.WithReasoningLevel(model.ReasoningLevelMed),
+		model.WithMaxTokens(1024),
 		s.mcpOption(),
 	}
 	if s.geminiBaseURL != "" {
