@@ -62,7 +62,7 @@ type anthropicContentBlock struct {
 	Name      string          `json:"name,omitempty"`
 	Input     json.RawMessage `json:"input,omitempty"`
 	ToolUseID string          `json:"tool_use_id,omitempty"`
-	Content   string          `json:"content,omitempty"`
+	Content   json.RawMessage `json:"content,omitempty"`
 	IsError   bool            `json:"is_error,omitempty"`
 }
 
@@ -72,22 +72,25 @@ type anthropicMessage struct {
 }
 
 type anthropicTool struct {
-	Name        string         `json:"name"`
-	Description string         `json:"description,omitempty"`
-	InputSchema map[string]any `json:"input_schema"`
+	Type          string         `json:"type,omitempty"`
+	Name          string         `json:"name,omitempty"`
+	Description   string         `json:"description,omitempty"`
+	InputSchema   map[string]any `json:"input_schema,omitempty"`
+	MCPServerName string         `json:"mcp_server_name,omitempty"`
+	DefaultConfig *anthropicMCPToolConfig           `json:"default_config,omitempty"`
+	Configs       map[string]anthropicMCPToolConfig `json:"configs,omitempty"`
 }
 
-type anthropicMCPToolConfiguration struct {
-	Enabled      *bool    `json:"enabled,omitempty"`
-	AllowedTools []string `json:"allowed_tools,omitempty"`
+type anthropicMCPToolConfig struct {
+	Enabled      *bool `json:"enabled,omitempty"`
+	DeferLoading *bool `json:"defer_loading,omitempty"`
 }
 
 type anthropicMCPServer struct {
-	Type               string                         `json:"type"`
-	Name               string                         `json:"name"`
-	URL                string                         `json:"url"`
-	AuthorizationToken string                         `json:"authorization_token,omitempty"`
-	ToolConfiguration  *anthropicMCPToolConfiguration `json:"tool_configuration,omitempty"`
+	Type               string `json:"type"`
+	Name               string `json:"name"`
+	URL                string `json:"url"`
+	AuthorizationToken string `json:"authorization_token,omitempty"`
 }
 
 type anthropicMessageRequest struct {

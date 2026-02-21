@@ -308,11 +308,15 @@ func runMessageFlow(
 			if marshalErr != nil {
 				return nil, totals, utils.WrapIfNotNil(marshalErr)
 			}
+			resultJSONText, marshalTextErr := json.Marshal(string(resultJSON))
+			if marshalTextErr != nil {
+				return nil, totals, utils.WrapIfNotNil(marshalTextErr)
+			}
 
 			results = append(results, anthropicContentBlock{
 				Type:      "tool_result",
 				ToolUseID: block.ID,
-				Content:   string(resultJSON),
+				Content:   resultJSONText,
 			})
 		}
 

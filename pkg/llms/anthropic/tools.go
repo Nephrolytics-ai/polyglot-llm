@@ -18,7 +18,7 @@ func buildAllTools(
 	ctx context.Context,
 	cfg model.GeneratorConfig,
 ) ([]anthropicTool, map[string]toolHandler, []anthropicMCPServer, func(), error) {
-	tools, handlers, err := mapLocalTools(cfg.Tools)
+	localTools, handlers, err := mapLocalTools(cfg.Tools)
 	if err != nil {
 		return nil, nil, nil, func() {}, utils.WrapIfNotNil(err)
 	}
@@ -27,6 +27,15 @@ func buildAllTools(
 	if err != nil {
 		return nil, nil, nil, func() {}, utils.WrapIfNotNil(err)
 	}
+
+	mcpToolsets, err := mapMCPToolsets(cfg.MCPTools)
+	if err != nil {
+		return nil, nil, nil, func() {}, utils.WrapIfNotNil(err)
+	}
+
+	tools := make([]anthropicTool, 0, len(localTools)+len(mcpToolsets))
+	tools = append(tools, localTools...)
+	tools = append(tools, mcpToolsets...)
 
 	return tools, handlers, mcpServers, func() {}, nil
 }
@@ -95,19 +104,40 @@ func mapMCPServers(ctx context.Context, mcpTools []model.MCPTool) ([]anthropicMC
 			server.AuthorizationToken = authorizationToken
 		}
 
-		allowedTools := normalizeAllowedTools(mcpTool.AllowedTools)
-		if len(allowedTools) > 0 {
-			enabled := true
-			server.ToolConfiguration = &anthropicMCPToolConfiguration{
-				Enabled:      &enabled,
-				AllowedTools: allowedTools,
-			}
-		}
-
 		servers = append(servers, server)
 	}
 
 	return servers, nil
+}
+
+func mapMCPToolsets(mcpTools []model.MCPTool) ([]anthropicTool, error) {
+	toolsets := make([]anthropicTool, 0, len(mcpTools))
+	for _, mcpTool := range mcpTools {
+		name := strings.TrimSpace(mcpTool.Name)
+		if name == "" {
+			return nil, utils.WrapIfNotNil(errors.New("mcp tool name is required"))
+		}
+		url := strings.TrimSpace(mcpTool.URL)
+		if url == "" {
+			return nil, utils.WrapIfNotNil(fmt.Errorf("mcp tool URL is required for %q", name))
+		}
+
+		toolsets = append(toolsets, anthropicTool{
+			Type:          "mcp_toolset",
+			MCPServerName: name,
+		})
+		if allowedTools := normalizeAllowedTools(mcpTool.AllowedTools); len(allowedTools) > 0 {
+			disabled := false
+			configs := make(map[string]anthropicMCPToolConfig, len(allowedTools))
+			for _, allowedTool := range allowedTools {
+				enabled := true
+				configs[allowedTool] = anthropicMCPToolConfig{Enabled: &enabled}
+			}
+			toolsets[len(toolsets)-1].DefaultConfig = &anthropicMCPToolConfig{Enabled: &disabled}
+			toolsets[len(toolsets)-1].Configs = configs
+		}
+	}
+	return toolsets, nil
 }
 
 func warnOnUnsupportedMCPHeaders(log logging.Logger, toolName string, headers map[string]string) {

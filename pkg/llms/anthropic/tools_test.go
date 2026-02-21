@@ -64,8 +64,6 @@ func (s *ToolsSuite) TestMapMCPServersAuthTokenAndAllowedTools() {
 	s.Equal("mcp-a", servers[0].Name)
 	s.Equal("https://example-mcp", servers[0].URL)
 	s.Equal("Bearer abc123", servers[0].AuthorizationToken)
-	s.NotNil(servers[0].ToolConfiguration)
-	s.ElementsMatch([]string{"tool-a", "tool-b"}, servers[0].ToolConfiguration.AllowedTools)
 }
 
 func (s *ToolsSuite) TestMapMCPServersIgnoresAuthorizationHeaderWithoutAuthToken() {
@@ -82,4 +80,44 @@ func (s *ToolsSuite) TestMapMCPServersIgnoresAuthorizationHeaderWithoutAuthToken
 	s.Require().NoError(err)
 	s.Len(servers, 1)
 	s.Empty(servers[0].AuthorizationToken)
+}
+
+func (s *ToolsSuite) TestMapMCPToolsetsCreatesServerReferences() {
+	toolsets, err := mapMCPToolsets([]model.MCPTool{
+		{
+			Name: "dev_lab_mcp",
+			URL:  "https://example-mcp",
+		},
+	})
+
+	s.Require().NoError(err)
+	s.Len(toolsets, 1)
+	s.Equal("mcp_toolset", toolsets[0].Type)
+	s.Empty(toolsets[0].Name)
+	s.Equal("dev_lab_mcp", toolsets[0].MCPServerName)
+}
+
+func (s *ToolsSuite) TestMapMCPToolsetsAllowedToolsConfig() {
+	toolsets, err := mapMCPToolsets([]model.MCPTool{
+		{
+			Name:         "dev_lab_mcp",
+			URL:          "https://example-mcp",
+			AllowedTools: []string{"lab_read", "lab_read", " patient_search "},
+		},
+	})
+
+	s.Require().NoError(err)
+	s.Len(toolsets, 1)
+	s.NotNil(toolsets[0].DefaultConfig)
+	s.Require().NotNil(toolsets[0].DefaultConfig.Enabled)
+	s.False(*toolsets[0].DefaultConfig.Enabled)
+	s.Require().Len(toolsets[0].Configs, 2)
+	labReadCfg, ok := toolsets[0].Configs["lab_read"]
+	s.True(ok)
+	s.Require().NotNil(labReadCfg.Enabled)
+	s.True(*labReadCfg.Enabled)
+	patientSearchCfg, ok := toolsets[0].Configs["patient_search"]
+	s.True(ok)
+	s.Require().NotNil(patientSearchCfg.Enabled)
+	s.True(*patientSearchCfg.Enabled)
 }

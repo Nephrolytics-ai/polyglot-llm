@@ -160,8 +160,8 @@ func (s *MCPIntegrationSuite) TestOpenAIWithMCPToolConfigAuthToken() {
 	assert.Equal(s.T(), "openai", metadata[model.MetadataKeyProvider])
 }
 
-// XTestAnthropicWithMCPTool todo, fix this up
-func (s *MCPIntegrationSuite) XTestAnthropicWithMCPTool() {
+// TestAnthropicWithMCPTool todo, fix this up
+func (s *MCPIntegrationSuite) TestAnthropicWithMCPTool() {
 	if s.anthropicKey == "" {
 		s.T().Skip("ANTHROPIC_API_KEY is not set; skipping Anthropic MCP integration test")
 	}
