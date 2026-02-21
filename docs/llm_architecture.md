@@ -18,7 +18,6 @@ This is the contract layer all providers implement.
 - `NewStructureContentGeneratorFunc[T any]`
 - `NewStringContentGeneratorFunc`
 - `NewEmbeddingGeneratorFunc`
-- `NewBatchEmbeddingGeneratorFunc`
 
 ### Core Interfaces
 
@@ -27,8 +26,8 @@ This is the contract layer all providers implement.
   - `AddPromptContext(ctx context.Context, messageType ContextMessageType, content string)`
   - `AddPromptContextProvider(ctx context.Context, provider PromptContextProvider)`
 - `EmbeddingGenerator`
-  - `Generate(ctx context.Context) (EmbeddingVector, GenerationMetadata, error)`
-  - `GenerateBatch(ctx context.Context) (EmbeddingVectors, GenerationMetadata, error)`
+  - `Generate(ctx context.Context, input string) (EmbeddingVector, GenerationMetadata, error)`
+  - `GenerateBatch(ctx context.Context, inputs []string) (EmbeddingVectors, GenerationMetadata, error)`
 
 ### Prompt Context Model
 

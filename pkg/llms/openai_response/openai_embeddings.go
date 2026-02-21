@@ -18,16 +18,10 @@ const defaultEmbeddingModelName = "text-embedding-3-small"
 
 type embeddingGenerator struct {
 	client *client
-	inputs []string
 	cfg    model.GeneratorConfig
 }
 
-func NewEmbeddingGenerator(input string, opts ...model.GeneratorOption) (model.EmbeddingGenerator, error) {
-	err := validateEmbeddingInputs([]string{input})
-	if err != nil {
-		return nil, utils.WrapIfNotNil(err)
-	}
-
+func NewEmbeddingGenerator(opts ...model.GeneratorOption) (model.EmbeddingGenerator, error) {
 	cfg := model.ResolveGeneratorOpts(opts...)
 	c, err := newClient(cfg)
 	if err != nil {
@@ -35,37 +29,15 @@ func NewEmbeddingGenerator(input string, opts ...model.GeneratorOption) (model.E
 	}
 	return &embeddingGenerator{
 		client: c,
-		inputs: []string{input},
 		cfg:    cfg,
 	}, nil
 }
 
-func NewBatchEmbeddingGenerator(inputs []string, opts ...model.GeneratorOption) (model.EmbeddingGenerator, error) {
-	err := validateEmbeddingInputs(inputs)
-	if err != nil {
-		return nil, utils.WrapIfNotNil(err)
-	}
-
-	cfg := model.ResolveGeneratorOpts(opts...)
-	c, err := newClient(cfg)
-	if err != nil {
-		return nil, utils.WrapIfNotNil(err)
-	}
-	return &embeddingGenerator{
-		client: c,
-		inputs: append([]string(nil), inputs...),
-		cfg:    cfg,
-	}, nil
-}
-
-func (g *embeddingGenerator) Generate(ctx context.Context) (model.EmbeddingVector, model.GenerationMetadata, error) {
-	if len(g.inputs) != 1 {
-		return nil, nil, utils.WrapIfNotNil(
-			fmt.Errorf("Generate requires exactly one input; got %d (use GenerateBatch for multiple inputs)", len(g.inputs)),
-		)
-	}
-
-	vectors, meta, err := g.GenerateBatch(ctx)
+func (g *embeddingGenerator) Generate(
+	ctx context.Context,
+	input string,
+) (model.EmbeddingVector, model.GenerationMetadata, error) {
+	vectors, meta, err := g.GenerateBatch(ctx, []string{input})
 	if err != nil {
 		return nil, meta, utils.WrapIfNotNil(err)
 	}
@@ -77,19 +49,22 @@ func (g *embeddingGenerator) Generate(ctx context.Context) (model.EmbeddingVecto
 	return vectors[0], meta, nil
 }
 
-func (g *embeddingGenerator) GenerateBatch(ctx context.Context) (model.EmbeddingVectors, model.GenerationMetadata, error) {
+func (g *embeddingGenerator) GenerateBatch(
+	ctx context.Context,
+	inputs []string,
+) (model.EmbeddingVectors, model.GenerationMetadata, error) {
 	start := time.Now()
 	meta := initMetadata(providerName, resolveEmbeddingModelName(g.cfg))
 	defer setLatencyMetadata(meta, start)
 
 	logging.NewLogger(ctx).Infof(
 		"embedding_request inputs=%d model=%q dimensions=%v",
-		len(g.inputs),
+		len(inputs),
 		resolveEmbeddingModelName(g.cfg),
 		g.cfg.EmbeddingDimensions,
 	)
 
-	vectors, response, err := g.client.runEmbeddings(ctx, g.inputs, g.cfg)
+	vectors, response, err := g.client.runEmbeddings(ctx, inputs, g.cfg)
 	if err != nil {
 		return nil, meta, utils.WrapIfNotNil(err)
 	}

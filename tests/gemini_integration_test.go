@@ -148,14 +148,11 @@ func (s *GeminiIntegrationSuite) TestSingleEmbeddingGeneration() {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	generator, err := gemini.NewEmbeddingGenerator(
-		"Kidney function and electrolyte balance.",
-		s.embeddingOpts()...,
-	)
+	generator, err := gemini.NewEmbeddingGenerator(s.embeddingOpts()...)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), generator)
 
-	vector, metadata, err := generator.Generate(ctx)
+	vector, metadata, err := generator.Generate(ctx, "Kidney function and electrolyte balance.")
 	require.NoError(s.T(), err)
 	require.NotEmpty(s.T(), vector)
 	assert.Greater(s.T(), len(vector), 0)
@@ -174,11 +171,11 @@ func (s *GeminiIntegrationSuite) TestBatchEmbeddingGeneration() {
 		"Glomerular filtration rate estimation details.",
 	}
 
-	generator, err := gemini.NewBatchEmbeddingGenerator(inputs, s.embeddingOpts()...)
+	generator, err := gemini.NewEmbeddingGenerator(s.embeddingOpts()...)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), generator)
 
-	vectors, metadata, err := generator.GenerateBatch(ctx)
+	vectors, metadata, err := generator.GenerateBatch(ctx, inputs)
 	require.NoError(s.T(), err)
 	require.Len(s.T(), vectors, len(inputs))
 	require.NotEmpty(s.T(), vectors[0])

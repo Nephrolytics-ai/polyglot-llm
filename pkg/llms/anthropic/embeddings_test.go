@@ -15,22 +15,20 @@ func TestEmbeddingsSuite(t *testing.T) {
 }
 
 func (s *EmbeddingsSuite) TestNewEmbeddingGeneratorReturnsUnsupported() {
-	generator, err := NewEmbeddingGenerator("hello")
+	generator, err := NewEmbeddingGenerator()
 	s.Nil(generator)
 	s.Error(err)
 	s.Contains(err.Error(), unsupportedEmbeddingsMessage)
 }
 
-func (s *EmbeddingsSuite) TestNewBatchEmbeddingGeneratorReturnsUnsupported() {
-	generator, err := NewBatchEmbeddingGenerator([]string{"hello", "world"})
-	s.Nil(generator)
-	s.Error(err)
-	s.Contains(err.Error(), unsupportedEmbeddingsMessage)
-}
-
-func (s *EmbeddingsSuite) TestNewBatchEmbeddingGeneratorEmptyInputReturnsError() {
-	generator, err := NewBatchEmbeddingGenerator([]string{"hello", "  "})
-	s.Nil(generator)
+func (s *EmbeddingsSuite) TestValidateEmbeddingInputsEmptyInputReturnsError() {
+	err := validateEmbeddingInputs([]string{"hello", "  "})
 	s.Error(err)
 	s.Contains(err.Error(), "input at index 1 is empty")
+}
+
+func (s *EmbeddingsSuite) TestValidateEmbeddingInputsMissingInputReturnsError() {
+	err := validateEmbeddingInputs(nil)
+	s.Error(err)
+	s.Contains(err.Error(), "at least one input is required")
 }

@@ -83,7 +83,7 @@ func mapMCPServers(ctx context.Context, mcpTools []model.MCPTool) ([]anthropicMC
 			return nil, utils.WrapIfNotNil(fmt.Errorf("mcp tool URL is required for %q", name))
 		}
 
-		authorizationToken := extractAuthorizationToken(mcpTool.HTTPHeaders)
+		authorizationToken := strings.TrimSpace(mcpTool.AuthToken)
 		warnOnUnsupportedMCPHeaders(log, mcpTool.Name, mcpTool.HTTPHeaders)
 
 		server := anthropicMCPServer{
@@ -110,15 +110,6 @@ func mapMCPServers(ctx context.Context, mcpTools []model.MCPTool) ([]anthropicMC
 	return servers, nil
 }
 
-func extractAuthorizationToken(headers map[string]string) string {
-	for k, v := range headers {
-		if strings.EqualFold(strings.TrimSpace(k), "Authorization") {
-			return strings.TrimSpace(v)
-		}
-	}
-	return ""
-}
-
 func warnOnUnsupportedMCPHeaders(log logging.Logger, toolName string, headers map[string]string) {
 	if log == nil || len(headers) == 0 {
 		return
@@ -126,18 +117,19 @@ func warnOnUnsupportedMCPHeaders(log logging.Logger, toolName string, headers ma
 
 	unsupported := make([]string, 0)
 	for key := range headers {
-		if !strings.EqualFold(strings.TrimSpace(key), "Authorization") {
-			unsupported = append(unsupported, key)
+		if strings.EqualFold(strings.TrimSpace(key), "Authorization") {
+			continue
 		}
+		unsupported = append(unsupported, key)
 	}
 	if len(unsupported) == 0 {
 		return
 	}
 
-	// NOTE: Anthropic MCP only supports Authorization via authorization_token and URL auth.
+	// NOTE: Anthropic MCP uses MCPTool.AuthToken for authorization_token forwarding.
 	// Arbitrary custom headers are not supported for remote MCP servers.
 	log.Warnf(
-		"mcp tool %q has unsupported custom headers (%s); only Authorization can be forwarded with Anthropic MCP",
+		"mcp tool %q has unsupported custom headers (%s); anthropic MCP uses MCPTool.AuthToken instead of HTTPHeaders",
 		toolName,
 		strings.Join(unsupported, ","),
 	)

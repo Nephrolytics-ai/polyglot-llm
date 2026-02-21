@@ -20,7 +20,7 @@ import (
 
 const (
 	providerName         = "anthropic"
-	defaultModelName     = "claude-3-5-sonnet-latest"
+	defaultModelName     = "claude-3-7-sonnet-latest"
 	defaultBaseURL       = "https://api.anthropic.com"
 	anthropicVersion     = "2023-06-01"
 	anthropicMCPBeta     = "mcp-client-2025-11-20"

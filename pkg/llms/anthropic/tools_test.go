@@ -45,14 +45,14 @@ func (s *ToolsSuite) TestMapLocalToolsDuplicateName() {
 	s.Contains(err.Error(), "duplicate tool name")
 }
 
-func (s *ToolsSuite) TestMapMCPServersAuthorizationAndAllowedTools() {
+func (s *ToolsSuite) TestMapMCPServersAuthTokenAndAllowedTools() {
 	servers, err := mapMCPServers(context.Background(), []model.MCPTool{
 		{
-			Name: "mcp-a",
-			URL:  "https://example-mcp",
+			Name:      "mcp-a",
+			URL:       "https://example-mcp",
+			AuthToken: "Bearer abc123",
 			HTTPHeaders: map[string]string{
-				"Authorization": "Bearer abc123",
-				"X-Custom":      "ignored",
+				"X-Custom": "ignored",
 			},
 			AllowedTools: []string{"tool-a", "tool-a", " tool-b "},
 		},
@@ -66,4 +66,20 @@ func (s *ToolsSuite) TestMapMCPServersAuthorizationAndAllowedTools() {
 	s.Equal("Bearer abc123", servers[0].AuthorizationToken)
 	s.NotNil(servers[0].ToolConfiguration)
 	s.ElementsMatch([]string{"tool-a", "tool-b"}, servers[0].ToolConfiguration.AllowedTools)
+}
+
+func (s *ToolsSuite) TestMapMCPServersIgnoresAuthorizationHeaderWithoutAuthToken() {
+	servers, err := mapMCPServers(context.Background(), []model.MCPTool{
+		{
+			Name: "mcp-a",
+			URL:  "https://example-mcp",
+			HTTPHeaders: map[string]string{
+				"Authorization": "Bearer from-header",
+			},
+		},
+	})
+
+	s.Require().NoError(err)
+	s.Len(servers, 1)
+	s.Empty(servers[0].AuthorizationToken)
 }

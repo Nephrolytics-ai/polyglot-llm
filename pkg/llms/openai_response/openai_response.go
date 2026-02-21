@@ -703,7 +703,8 @@ func mapMCPTools(ctx context.Context, tools []model.MCPTool) ([]responses.ToolUn
 			return nil, utils.WrapIfNotNil(fmt.Errorf("mcp tool URL is required for %q", tool.Name))
 		}
 
-		authorization := extractAuthorization(tool.HTTPHeaders)
+		headers := mcpHeadersWithAuthToken(tool.HTTPHeaders, tool.AuthToken)
+		authorization := extractAuthorization(headers)
 		allowedTools := append([]string(nil), tool.AllowedTools...)
 		if len(allowedTools) == 0 {
 			discoveredTools, err := mcp.FetchListOfTools(ctx, tool.URL, authorization)
@@ -718,7 +719,7 @@ func mapMCPTools(ctx context.Context, tools []model.MCPTool) ([]responses.ToolUn
 		param := responses.ToolMcpParam{
 			ServerLabel: tool.Name,
 			ServerURL:   openai.String(tool.URL),
-			Headers:     copyHeaders(tool.HTTPHeaders),
+			Headers:     headers,
 			Type:        "mcp",
 		}
 		if len(allowedTools) > 0 {
@@ -741,6 +742,21 @@ func mapMCPTools(ctx context.Context, tools []model.MCPTool) ([]responses.ToolUn
 	}
 
 	return responseTools, nil
+}
+
+func mcpHeadersWithAuthToken(headers map[string]string, authToken string) map[string]string {
+	effective := copyHeaders(headers)
+	if strings.TrimSpace(authToken) == "" {
+		return effective
+	}
+	if extractAuthorization(effective) != "" {
+		return effective
+	}
+	if effective == nil {
+		effective = map[string]string{}
+	}
+	effective["Authorization"] = "Bearer " + strings.TrimSpace(authToken)
+	return effective
 }
 
 func extractAuthorization(headers map[string]string) string {

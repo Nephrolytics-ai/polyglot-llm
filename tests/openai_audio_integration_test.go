@@ -19,8 +19,9 @@ type OpenAIAudioIntegrationSuite struct {
 	apiKey    string
 	baseURL   string
 	modelName string
-	audioFile string
 }
+
+const openAIAudioFixturePath = "data/transcript_test1.m4a"
 
 func (s *OpenAIAudioIntegrationSuite) SetupSuite() {
 	s.ExternalDependenciesSuite.SetupSuite()
@@ -28,16 +29,12 @@ func (s *OpenAIAudioIntegrationSuite) SetupSuite() {
 	s.apiKey = strings.TrimSpace(os.Getenv("OPEN_API_TOKEN"))
 	s.baseURL = strings.TrimSpace(os.Getenv("OPENAI_BASE_URL"))
 	s.modelName = strings.TrimSpace(os.Getenv("OPENAI_AUDIO_MODEL"))
-	s.audioFile = strings.TrimSpace(os.Getenv("OPENAI_AUDIO_TEST_FILE"))
 
 	if s.apiKey == "" {
 		s.T().Skip("OPEN_API_TOKEN is not set; skipping external dependency integration test")
 	}
-	if s.audioFile == "" {
-		s.T().Skip("OPENAI_AUDIO_TEST_FILE is not set; skipping OpenAI audio integration test")
-	}
-	if _, err := os.Stat(s.audioFile); err != nil {
-		s.T().Skipf("OPENAI_AUDIO_TEST_FILE is not accessible (%v); skipping OpenAI audio integration test", err)
+	if _, err := os.Stat(openAIAudioFixturePath); err != nil {
+		s.T().Skipf("%s is not accessible (%v); skipping OpenAI audio integration test", openAIAudioFixturePath, err)
 	}
 	if s.modelName == "" {
 		s.modelName = "whisper-1"
@@ -60,13 +57,15 @@ func (s *OpenAIAudioIntegrationSuite) TestCreateGeneratorAndGenerateTranscript()
 	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 
-	generator, err := openai_response.NewAudioTranscriptionGenerator(s.audioFile, s.audioOptions())
+	generator, err := openai_response.NewAudioTranscriptionGenerator(openAIAudioFixturePath, s.audioOptions())
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), generator)
 
 	transcript, metadata, err := generator.Generate(ctx)
 	require.NoError(s.T(), err)
 	assert.NotEmpty(s.T(), strings.TrimSpace(transcript))
+	normalizedTranscript := strings.ToLower(transcript)
+	assert.Contains(s.T(), normalizedTranscript, strings.ToLower("egfr"))
 	assert.Equal(s.T(), "openai_response", metadata[model.MetadataKeyProvider])
 	assert.NotEmpty(s.T(), metadata[model.MetadataKeyLatencyMs])
 	assert.NotEmpty(s.T(), metadata[model.MetadataKeyModel])
