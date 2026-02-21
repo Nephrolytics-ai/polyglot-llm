@@ -1,0 +1,80 @@
+package tests
+
+import (
+	"context"
+	"os"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/openai_response"
+	"github.com/Nephrolytics-ai/polyglot-llm/pkg/model"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+)
+
+type OpenAIAudioIntegrationSuite struct {
+	ExternalDependenciesSuite
+	apiKey    string
+	baseURL   string
+	modelName string
+	audioFile string
+}
+
+func (s *OpenAIAudioIntegrationSuite) SetupSuite() {
+	s.ExternalDependenciesSuite.SetupSuite()
+
+	s.apiKey = strings.TrimSpace(os.Getenv("OPEN_API_TOKEN"))
+	s.baseURL = strings.TrimSpace(os.Getenv("OPENAI_BASE_URL"))
+	s.modelName = strings.TrimSpace(os.Getenv("OPENAI_AUDIO_MODEL"))
+	s.audioFile = strings.TrimSpace(os.Getenv("OPENAI_AUDIO_TEST_FILE"))
+
+	if s.apiKey == "" {
+		s.T().Skip("OPEN_API_TOKEN is not set; skipping external dependency integration test")
+	}
+	if s.audioFile == "" {
+		s.T().Skip("OPENAI_AUDIO_TEST_FILE is not set; skipping OpenAI audio integration test")
+	}
+	if _, err := os.Stat(s.audioFile); err != nil {
+		s.T().Skipf("OPENAI_AUDIO_TEST_FILE is not accessible (%v); skipping OpenAI audio integration test", err)
+	}
+	if s.modelName == "" {
+		s.modelName = "whisper-1"
+	}
+}
+
+func (s *OpenAIAudioIntegrationSuite) audioOptions() model.AudioOptions {
+	return model.AudioOptions{
+		AuthToken: s.apiKey,
+		URL:       s.baseURL,
+		Model:     s.modelName,
+		Keywords: map[string]string{
+			"afib":       "atrial fibrillation",
+			"creatinine": "creatinine",
+		},
+	}
+}
+
+func (s *OpenAIAudioIntegrationSuite) TestCreateGeneratorAndGenerateTranscript() {
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
+	defer cancel()
+
+	generator, err := openai_response.NewAudioTranscriptionGenerator(s.audioFile, s.audioOptions())
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), generator)
+
+	transcript, metadata, err := generator.Generate(ctx)
+	require.NoError(s.T(), err)
+	assert.NotEmpty(s.T(), strings.TrimSpace(transcript))
+	assert.Equal(s.T(), "openai_response", metadata[model.MetadataKeyProvider])
+	assert.NotEmpty(s.T(), metadata[model.MetadataKeyLatencyMs])
+	assert.NotEmpty(s.T(), metadata[model.MetadataKeyModel])
+	assert.NotEmpty(s.T(), metadata[model.MetadataKeyInputTokens])
+	assert.NotEmpty(s.T(), metadata[model.MetadataKeyOutputTokens])
+	assert.NotEmpty(s.T(), metadata[model.MetadataKeyTotalTokens])
+}
+
+func TestOpenAIAudioIntegrationSuite(t *testing.T) {
+	suite.Run(t, new(OpenAIAudioIntegrationSuite))
+}
