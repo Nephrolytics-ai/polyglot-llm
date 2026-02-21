@@ -20,7 +20,7 @@ Audience: developers and assistants working in this repo.
 - Avoid modifying unrelated files; don’t revert user changes.
 - Respect missing/stale-data handling before running diagnostic calculations.
 - If you see no code or comments, assume its ok, dont change it unless instructed.  
-# Spelling and Grammer
+# Spelling and Grammar
  - I am a bad speller, if a type name I give you looks like it has a spelling error, auto correct please
 
 # API Conventions
