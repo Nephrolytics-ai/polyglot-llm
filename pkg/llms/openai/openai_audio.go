@@ -1,4 +1,4 @@
-package openai_response
+package openai
 
 import (
 	"context"

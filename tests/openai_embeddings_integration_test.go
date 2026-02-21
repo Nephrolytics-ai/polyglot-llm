@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/openai_response"
+	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/openai"
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -46,7 +46,7 @@ func (s *OpenAIEmbeddingsIntegrationSuite) TestGenerateSingleEmbedding() {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	generator, err := openai_response.NewEmbeddingGenerator(s.embeddingOpts()...)
+	generator, err := openai.NewEmbeddingGenerator(s.embeddingOpts()...)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), generator)
 
@@ -70,7 +70,7 @@ func (s *OpenAIEmbeddingsIntegrationSuite) TestGenerateBatchEmbeddings() {
 		"Glomerular filtration rate estimation details.",
 	}
 
-	generator, err := openai_response.NewEmbeddingGenerator(s.embeddingOpts()...)
+	generator, err := openai.NewEmbeddingGenerator(s.embeddingOpts()...)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), generator)
 

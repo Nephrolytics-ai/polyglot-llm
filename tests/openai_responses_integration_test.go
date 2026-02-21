@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/openai_response"
+	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/openai"
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,7 +58,7 @@ func (s *OpenAIResponsesIntegrationSuite) TestCreateGeneratorAndGenerate() {
 		model.WithMaxTokens(256),
 	)
 
-	generator, err := openai_response.NewStringContentGenerator(
+	generator, err := openai.NewStringContentGenerator(
 		"How are you today.",
 		opts...,
 	)
@@ -89,7 +89,7 @@ func (s *OpenAIResponsesIntegrationSuite) TestCreateStructuredGeneratorAndGenera
 		model.WithMaxTokens(256),
 	)
 
-	generator, err := openai_response.NewStructureContentGenerator[basicStructuredResponse](
+	generator, err := openai.NewStructureContentGenerator[basicStructuredResponse](
 		"Return JSON with fields status and message. Set status to ok and message to a short greeting.",
 		opts...,
 	)
@@ -143,7 +143,7 @@ func (s *OpenAIResponsesIntegrationSuite) TestCreateGeneratorAndGenerateWithTool
 		model.WithTools(tools),
 	)
 
-	generator, err := openai_response.NewStructureContentGenerator[toolStructuredResponse](
+	generator, err := openai.NewStructureContentGenerator[toolStructuredResponse](
 		"Call the get_secret_value tool and return JSON with only the field secret set to the exact tool value.",
 		opts...,
 	)

@@ -1,4 +1,4 @@
-package openai_response
+package openai
 
 import (
 	"context"
@@ -24,7 +24,7 @@ import (
 const (
 	defaultModelName = "gpt-5-mini"
 	maxToolRounds    = 12
-	providerName     = "openai_response"
+	providerName     = "openai"
 )
 
 type toolHandler func(ctx context.Context, args json.RawMessage) (any, error)
@@ -101,7 +101,7 @@ func (g *structuredGenerator[T]) AddPromptContext(ctx context.Context, messageTy
 		Content:     content,
 	})
 	log.Debugf(
-		"openai_response.structuredGenerator.AddPromptContext total_contexts=%d",
+		"openai.structuredGenerator.AddPromptContext total_contexts=%d",
 		len(g.promptContexts),
 	)
 }
@@ -115,7 +115,7 @@ func (g *structuredGenerator[T]) AddPromptContextProvider(ctx context.Context, p
 	defer g.promptContextMu.Unlock()
 	g.promptContextProviders = append(g.promptContextProviders, provider)
 	logging.NewLogger(ctx).Debugf(
-		"openai_response.structuredGenerator.AddPromptContextProvider total_providers=%d",
+		"openai.structuredGenerator.AddPromptContextProvider total_providers=%d",
 		len(g.promptContextProviders),
 	)
 }
@@ -215,7 +215,7 @@ func (g *textGenerator) AddPromptContext(ctx context.Context, messageType model.
 		Content:     content,
 	})
 	log.Debugf(
-		"openai_response.textGenerator.AddPromptContext total_contexts=%d",
+		"openai.textGenerator.AddPromptContext total_contexts=%d",
 		len(g.promptContexts),
 	)
 }
@@ -229,7 +229,7 @@ func (g *textGenerator) AddPromptContextProvider(ctx context.Context, provider m
 	defer g.promptContextMu.Unlock()
 	g.promptContextProviders = append(g.promptContextProviders, provider)
 	logging.NewLogger(ctx).Debugf(
-		"openai_response.textGenerator.AddPromptContextProvider total_providers=%d",
+		"openai.textGenerator.AddPromptContextProvider total_providers=%d",
 		len(g.promptContextProviders),
 	)
 }

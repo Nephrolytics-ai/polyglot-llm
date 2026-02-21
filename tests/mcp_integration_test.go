@@ -12,7 +12,7 @@ import (
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/bedrock"
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/gemini"
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/ollama"
-	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/openai_response"
+	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/openai"
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -123,13 +123,13 @@ func (s *MCPIntegrationSuite) TestOpenAIWithMCPToolHeaderAuthorization() {
 		opts = append(opts, model.WithURL(s.openAIBaseURL))
 	}
 
-	generator, err := openai_response.NewStringContentGenerator(mcpPrompt, opts...)
+	generator, err := openai.NewStringContentGenerator(mcpPrompt, opts...)
 	require.NoError(s.T(), err)
 
 	output, metadata, err := generator.Generate(ctx)
 	require.NoError(s.T(), err)
 	s.assertContainsNeedle(output)
-	assert.Equal(s.T(), "openai_response", metadata[model.MetadataKeyProvider])
+	assert.Equal(s.T(), "openai", metadata[model.MetadataKeyProvider])
 }
 
 func (s *MCPIntegrationSuite) TestOpenAIWithMCPToolConfigAuthToken() {
@@ -151,13 +151,13 @@ func (s *MCPIntegrationSuite) TestOpenAIWithMCPToolConfigAuthToken() {
 		opts = append(opts, model.WithURL(s.openAIBaseURL))
 	}
 
-	generator, err := openai_response.NewStringContentGenerator(mcpPrompt, opts...)
+	generator, err := openai.NewStringContentGenerator(mcpPrompt, opts...)
 	require.NoError(s.T(), err)
 
 	output, metadata, err := generator.Generate(ctx)
 	require.NoError(s.T(), err)
 	s.assertContainsNeedle(output)
-	assert.Equal(s.T(), "openai_response", metadata[model.MetadataKeyProvider])
+	assert.Equal(s.T(), "openai", metadata[model.MetadataKeyProvider])
 }
 
 // XTestAnthropicWithMCPTool todo, fix this up
