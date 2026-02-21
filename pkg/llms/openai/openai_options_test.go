@@ -1,4 +1,4 @@
-package openai_response
+package openai
 
 import (
 	"context"
@@ -153,6 +153,31 @@ func (s *GeneratorOptionValidationSuite) TestMapContextMessageRole() {
 	s.Assert().Equal(responses.EasyInputMessageRoleAssistant, mapContextMessageRole(model.ContextMessageTypeAssistant))
 	s.Assert().Equal(responses.EasyInputMessageRoleUser, mapContextMessageRole(model.ContextMessageTypeHuman))
 	s.Assert().Equal(responses.EasyInputMessageRoleUser, mapContextMessageRole(model.ContextMessageType("unknown")))
+}
+
+func (s *GeneratorOptionValidationSuite) TestMCPHeadersWithAuthTokenAddsAuthorizationWhenMissing() {
+	headers := mcpHeadersWithAuthToken(
+		map[string]string{"X-Custom": "abc"},
+		"mcp-token-123",
+	)
+
+	s.Require().NotNil(headers)
+	s.Equal("abc", headers["X-Custom"])
+	s.Equal("Bearer mcp-token-123", headers["Authorization"])
+}
+
+func (s *GeneratorOptionValidationSuite) TestMCPHeadersWithAuthTokenPreservesAuthorizationWhenPresent() {
+	headers := mcpHeadersWithAuthToken(
+		map[string]string{
+			"Authorization": "Bearer existing",
+			"X-Custom":      "abc",
+		},
+		"mcp-token-123",
+	)
+
+	s.Require().NotNil(headers)
+	s.Equal("Bearer existing", headers["Authorization"])
+	s.Equal("abc", headers["X-Custom"])
 }
 
 type stubPromptContextProvider struct {

@@ -18,7 +18,6 @@ This is the contract layer all providers implement.
 - `NewStructureContentGeneratorFunc[T any]`
 - `NewStringContentGeneratorFunc`
 - `NewEmbeddingGeneratorFunc`
-- `NewBatchEmbeddingGeneratorFunc`
 
 ### Core Interfaces
 
@@ -27,8 +26,8 @@ This is the contract layer all providers implement.
   - `AddPromptContext(ctx context.Context, messageType ContextMessageType, content string)`
   - `AddPromptContextProvider(ctx context.Context, provider PromptContextProvider)`
 - `EmbeddingGenerator`
-  - `Generate(ctx context.Context) (EmbeddingVector, GenerationMetadata, error)`
-  - `GenerateBatch(ctx context.Context) (EmbeddingVectors, GenerationMetadata, error)`
+  - `Generate(ctx context.Context, input string) (EmbeddingVector, GenerationMetadata, error)`
+  - `GenerateBatch(ctx context.Context, inputs []string) (EmbeddingVectors, GenerationMetadata, error)`
 
 ### Prompt Context Model
 
@@ -96,7 +95,7 @@ Providers may add additional keys, but these should remain stable.
 
 | Provider | Package | Structured/String Generation | Embeddings | Auth | URL Configuration | Internal APIs Used | MCP Support Mode |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| OpenAI Responses | `pkg/llms/openai_response` | Yes | Yes | `WithAuthToken`; if omitted, `openai-go` can read `OPENAI_API_KEY` | `WithURL` -> OpenAI client base URL | `openai-go/v3`: `Responses.New`, `Embeddings.New` | Native MCP via OpenAI Responses MCP tool type |
+| OpenAI Responses | `pkg/llms/openai` | Yes | Yes | `WithAuthToken`; if omitted, `openai-go` can read `OPENAI_API_KEY` | `WithURL` -> OpenAI client base URL | `openai-go/v3`: `Responses.New`, `Embeddings.New` | Native MCP via OpenAI Responses MCP tool type |
 | Gemini | `pkg/llms/gemini` | Yes | Yes | `WithAuthToken` or env `GEMINI_KEY` | `WithURL` -> `genai.HTTPOptions.BaseURL` | `google.golang.org/genai`: `Models.GenerateContent`, `Models.EmbedContent` | Uses MCP Tool Adapter (`pkg/mcp`) to bridge MCP into normal tool calls |
 | Bedrock | `pkg/llms/bedrock` | Yes | No | Env only: `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` (optional `AWS_SESSION_TOKEN`) OR `AWS_PROFILE`; region from `AWS_REGION` (default `us-east-1`) | `WithURL` -> Bedrock `BaseEndpoint` override | `aws-sdk-go-v2/service/bedrockruntime`: `Converse` | Uses MCP Tool Adapter (`pkg/mcp`) to bridge MCP into normal tool calls |
 | Ollama | `pkg/llms/ollama` | Yes | Yes | None required | `WithURL`, else `OLLAMA_BASE_URL`, else `http://localhost:11434` | Native HTTP `/api/chat` (including tool loop), `/api/embed` with fallback `/api/embeddings` | Uses MCP Tool Adapter (`pkg/mcp`) to bridge MCP into normal tool calls |

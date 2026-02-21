@@ -9,58 +9,62 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/openai"
+	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/anthropic"
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
-type OpenAIResponsesIntegrationSuite struct {
+type AnthropicIntegrationSuite struct {
 	ExternalDependenciesSuite
 	apiKey  string
 	baseURL string
+	model   string
 }
 
-type basicStructuredResponse struct {
+type anthropicStructuredResponse struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
 }
 
-type toolStructuredResponse struct {
+type anthropicToolStructuredResponse struct {
 	Secret string `json:"secret"`
 }
 
-func (s *OpenAIResponsesIntegrationSuite) SetupSuite() {
+func (s *AnthropicIntegrationSuite) SetupSuite() {
 	s.ExternalDependenciesSuite.SetupSuite()
 
-	s.apiKey = strings.TrimSpace(os.Getenv("OPEN_API_TOKEN"))
-	s.baseURL = strings.TrimSpace(os.Getenv("OPENAI_BASE_URL"))
+	s.apiKey = strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY"))
+	s.baseURL = strings.TrimSpace(os.Getenv("ANTHROPIC_BASE_URL"))
+	s.model = strings.TrimSpace(os.Getenv("ANTHROPIC_MODEL"))
 	if s.apiKey == "" {
-		s.T().Skip("OPEN_API_TOKEN is not set; skipping external dependency integration test")
+		s.T().Skip("ANTHROPIC_API_KEY is not set; skipping external dependency integration test")
+	}
+	if s.model == "" {
+		s.model = "claude-sonnet-4-6"
 	}
 }
 
-func (s *OpenAIResponsesIntegrationSuite) TestCreateGeneratorAndGenerate() {
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-	defer cancel()
-
+func (s *AnthropicIntegrationSuite) generationOpts() []model.GeneratorOption {
 	opts := []model.GeneratorOption{
 		model.WithAuthToken(s.apiKey),
+		model.WithModel(s.model),
+		model.WithMaxTokens(256),
 	}
 	if s.baseURL != "" {
 		opts = append(opts, model.WithURL(s.baseURL))
 	}
+	return opts
+}
 
-	opts = append(opts,
-		model.WithModel("gpt-5-mini"),
-		model.WithReasoningLevel(model.ReasoningLevelLow),
-		model.WithMaxTokens(256),
-	)
+func (s *AnthropicIntegrationSuite) TestCreateGeneratorAndGenerate() {
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
 
-	generator, err := openai.NewStringContentGenerator(
-		"How are you today.",
-		opts...,
+	generator, err := anthropic.NewStringContentGenerator(
+		"Reply with one short sentence saying hello.",
+		s.generationOpts()...,
 	)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), generator)
@@ -68,30 +72,18 @@ func (s *OpenAIResponsesIntegrationSuite) TestCreateGeneratorAndGenerate() {
 	output, metadata, err := generator.Generate(ctx)
 	require.NoError(s.T(), err)
 	assert.NotEmpty(s.T(), strings.TrimSpace(output))
-	assert.NotEmpty(s.T(), metadata[model.MetadataKeyProvider])
+	assert.Equal(s.T(), "anthropic", metadata[model.MetadataKeyProvider])
 	assert.NotEmpty(s.T(), metadata[model.MetadataKeyLatencyMs])
+	assert.NotEmpty(s.T(), metadata[model.MetadataKeyModel])
 }
 
-func (s *OpenAIResponsesIntegrationSuite) TestCreateStructuredGeneratorAndGenerate() {
+func (s *AnthropicIntegrationSuite) TestCreateStructuredGeneratorAndGenerate() {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	opts := []model.GeneratorOption{
-		model.WithAuthToken(s.apiKey),
-	}
-	if s.baseURL != "" {
-		opts = append(opts, model.WithURL(s.baseURL))
-	}
-
-	opts = append(opts,
-		model.WithModel("gpt-5-mini"),
-		model.WithReasoningLevel(model.ReasoningLevelLow),
-		model.WithMaxTokens(256),
-	)
-
-	generator, err := openai.NewStructureContentGenerator[basicStructuredResponse](
+	generator, err := anthropic.NewStructureContentGenerator[anthropicStructuredResponse](
 		"Return JSON with fields status and message. Set status to ok and message to a short greeting.",
-		opts...,
+		s.generationOpts()...,
 	)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), generator)
@@ -100,15 +92,16 @@ func (s *OpenAIResponsesIntegrationSuite) TestCreateStructuredGeneratorAndGenera
 	require.NoError(s.T(), err)
 	assert.NotEmpty(s.T(), strings.TrimSpace(output.Status))
 	assert.NotEmpty(s.T(), strings.TrimSpace(output.Message))
-	assert.NotEmpty(s.T(), metadata[model.MetadataKeyProvider])
+	assert.Equal(s.T(), "anthropic", metadata[model.MetadataKeyProvider])
 	assert.NotEmpty(s.T(), metadata[model.MetadataKeyLatencyMs])
+	assert.NotEmpty(s.T(), metadata[model.MetadataKeyModel])
 }
 
-func (s *OpenAIResponsesIntegrationSuite) TestCreateGeneratorAndGenerateWithTool() {
+func (s *AnthropicIntegrationSuite) TestCreateGeneratorAndGenerateWithTool() {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	const toolSecret = "tool-secret-value-123"
+	const toolSecret = "anthropic-tool-secret-123"
 	var toolCalls atomic.Int32
 
 	tools := []model.Tool{
@@ -129,21 +122,10 @@ func (s *OpenAIResponsesIntegrationSuite) TestCreateGeneratorAndGenerateWithTool
 		},
 	}
 
-	opts := []model.GeneratorOption{
-		model.WithAuthToken(s.apiKey),
-	}
-	if s.baseURL != "" {
-		opts = append(opts, model.WithURL(s.baseURL))
-	}
+	opts := append([]model.GeneratorOption{}, s.generationOpts()...)
+	opts = append(opts, model.WithTools(tools))
 
-	opts = append(opts,
-		model.WithModel("gpt-5-mini"),
-		model.WithReasoningLevel(model.ReasoningLevelLow),
-		model.WithMaxTokens(256),
-		model.WithTools(tools),
-	)
-
-	generator, err := openai.NewStructureContentGenerator[toolStructuredResponse](
+	generator, err := anthropic.NewStructureContentGenerator[anthropicToolStructuredResponse](
 		"Call the get_secret_value tool and return JSON with only the field secret set to the exact tool value.",
 		opts...,
 	)
@@ -154,10 +136,11 @@ func (s *OpenAIResponsesIntegrationSuite) TestCreateGeneratorAndGenerateWithTool
 	require.NoError(s.T(), err)
 	assert.GreaterOrEqual(s.T(), toolCalls.Load(), int32(1))
 	assert.Equal(s.T(), toolSecret, strings.TrimSpace(output.Secret))
-	assert.NotEmpty(s.T(), metadata[model.MetadataKeyProvider])
+	assert.Equal(s.T(), "anthropic", metadata[model.MetadataKeyProvider])
 	assert.NotEmpty(s.T(), metadata[model.MetadataKeyLatencyMs])
+	assert.NotEmpty(s.T(), metadata[model.MetadataKeyModel])
 }
 
-func TestOpenAIResponsesIntegrationSuite(t *testing.T) {
-	suite.Run(t, new(OpenAIResponsesIntegrationSuite))
+func TestAnthropicIntegrationSuite(t *testing.T) {
+	suite.Run(t, new(AnthropicIntegrationSuite))
 }

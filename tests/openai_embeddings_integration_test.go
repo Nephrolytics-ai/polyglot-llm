@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/openai_response"
+	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/openai"
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -46,14 +46,11 @@ func (s *OpenAIEmbeddingsIntegrationSuite) TestGenerateSingleEmbedding() {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	generator, err := openai_response.NewEmbeddingGenerator(
-		"Hello from integration test.",
-		s.embeddingOpts()...,
-	)
+	generator, err := openai.NewEmbeddingGenerator(s.embeddingOpts()...)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), generator)
 
-	vector, metadata, err := generator.Generate(ctx)
+	vector, metadata, err := generator.Generate(ctx, "Hello from integration test.")
 	require.NoError(s.T(), err)
 	require.NotEmpty(s.T(), vector)
 	assert.Greater(s.T(), len(vector), 0)
@@ -73,11 +70,11 @@ func (s *OpenAIEmbeddingsIntegrationSuite) TestGenerateBatchEmbeddings() {
 		"Glomerular filtration rate estimation details.",
 	}
 
-	generator, err := openai_response.NewBatchEmbeddingGenerator(inputs, s.embeddingOpts()...)
+	generator, err := openai.NewEmbeddingGenerator(s.embeddingOpts()...)
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), generator)
 
-	vectors, metadata, err := generator.GenerateBatch(ctx)
+	vectors, metadata, err := generator.GenerateBatch(ctx, inputs)
 	require.NoError(s.T(), err)
 	require.Len(s.T(), vectors, len(inputs))
 	require.NotEmpty(s.T(), vectors[0])

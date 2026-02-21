@@ -1,4 +1,4 @@
-package openai_response
+package openai
 
 import (
 	"testing"
@@ -16,25 +16,10 @@ func TestEmbeddingGeneratorSuite(t *testing.T) {
 	suite.Run(t, new(EmbeddingGeneratorSuite))
 }
 
-func (s *EmbeddingGeneratorSuite) TestNewEmbeddingGeneratorEmptyInputReturnsError() {
-	generator, err := NewEmbeddingGenerator("   ")
-
-	s.Require().Error(err)
-	s.Nil(generator)
-}
-
-func (s *EmbeddingGeneratorSuite) TestNewBatchEmbeddingGeneratorEmptyInputsReturnsError() {
-	generator, err := NewBatchEmbeddingGenerator(nil)
-
-	s.Require().Error(err)
-	s.Nil(generator)
-}
-
-func (s *EmbeddingGeneratorSuite) TestNewBatchEmbeddingGeneratorContainsEmptyInputReturnsError() {
-	generator, err := NewBatchEmbeddingGenerator([]string{"hello", " "})
-
-	s.Require().Error(err)
-	s.Nil(generator)
+func (s *EmbeddingGeneratorSuite) TestNewEmbeddingGeneratorNoInputReturnsGenerator() {
+	generator, err := NewEmbeddingGenerator()
+	s.Require().NoError(err)
+	s.NotNil(generator)
 }
 
 func (s *EmbeddingGeneratorSuite) TestResolveEmbeddingModelNameUsesDefault() {
@@ -81,4 +66,16 @@ func (s *EmbeddingGeneratorSuite) TestConvertEmbeddingResponseMismatchedLengthRe
 	_, err := convertEmbeddingResponse(response, 2)
 	s.Require().Error(err)
 	s.Contains(err.Error(), "embedding response size mismatch")
+}
+
+func (s *EmbeddingGeneratorSuite) TestValidateEmbeddingInputsEmptyInputsReturnsError() {
+	err := validateEmbeddingInputs(nil)
+	s.Require().Error(err)
+	s.Contains(err.Error(), "at least one input is required")
+}
+
+func (s *EmbeddingGeneratorSuite) TestValidateEmbeddingInputsContainsEmptyInputReturnsError() {
+	err := validateEmbeddingInputs([]string{"hello", " "})
+	s.Require().Error(err)
+	s.Contains(err.Error(), "input at index 1 is empty")
 }

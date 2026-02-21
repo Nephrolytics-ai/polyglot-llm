@@ -8,10 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/anthropic"
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/bedrock"
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/gemini"
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/ollama"
-	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/openai_response"
+	"github.com/Nephrolytics-ai/polyglot-llm/pkg/llms/openai"
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,14 +27,17 @@ const (
 type MCPIntegrationSuite struct {
 	ExternalDependenciesSuite
 
-	openAIKey       string
-	openAIBaseURL   string
-	geminiKey       string
-	geminiBaseURL   string
-	ollamaBaseURL   string
-	ollamaChatModel string
-	mcpServerURL    string
-	mcpAuthHeader   string
+	anthropicKey     string
+	anthropicBaseURL string
+	anthropicModel   string
+	openAIKey        string
+	openAIBaseURL    string
+	geminiKey        string
+	geminiBaseURL    string
+	ollamaBaseURL    string
+	ollamaChatModel  string
+	mcpServerURL     string
+	mcpAuthHeader    string
 }
 
 func (s *MCPIntegrationSuite) SetupSuite() {
@@ -44,6 +48,9 @@ func (s *MCPIntegrationSuite) SetupSuite() {
 		s.T().Skip("RUN_MCP_TEST is not true; skipping MCP integration tests")
 	}
 
+	s.anthropicKey = strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY"))
+	s.anthropicBaseURL = strings.TrimSpace(os.Getenv("ANTHROPIC_BASE_URL"))
+	s.anthropicModel = strings.TrimSpace(os.Getenv("ANTHROPIC_MODEL"))
 	s.openAIKey = strings.TrimSpace(os.Getenv("OPEN_API_TOKEN"))
 	s.openAIBaseURL = strings.TrimSpace(os.Getenv("OPENAI_BASE_URL"))
 	s.geminiKey = strings.TrimSpace(os.Getenv("GEMINI_KEY"))
@@ -63,14 +70,27 @@ func (s *MCPIntegrationSuite) SetupSuite() {
 	if s.ollamaChatModel == "" {
 		s.ollamaChatModel = "gpt-oss:20b"
 	}
+	if s.anthropicModel == "" {
+		s.anthropicModel = "claude-sonnet-4-6"
+	}
 }
 
-func (s *MCPIntegrationSuite) mcpOption() model.GeneratorOption {
+func (s *MCPIntegrationSuite) mcpOptionWithHeader() model.GeneratorOption {
 	return model.WithMCPTools([]model.MCPTool{
 		{
 			Name:        "dev_lab_mcp",
 			URL:         s.mcpServerURL,
 			HTTPHeaders: map[string]string{"Authorization": s.mcpAuthHeader},
+		},
+	})
+}
+
+func (s *MCPIntegrationSuite) mcpOptionWithAuthToken() model.GeneratorOption {
+	return model.WithMCPTools([]model.MCPTool{
+		{
+			Name:      "dev_lab_mcp",
+			URL:       s.mcpServerURL,
+			AuthToken: s.mcpAuthHeader,
 		},
 	})
 }
@@ -84,7 +104,7 @@ func (s *MCPIntegrationSuite) assertContainsNeedle(output string) {
 	assert.Contains(s.T(), normalizedOutput, normalizedNeedle)
 }
 
-func (s *MCPIntegrationSuite) TestOpenAIWithMCPTool() {
+func (s *MCPIntegrationSuite) TestOpenAIWithMCPToolHeaderAuthorization() {
 	if s.openAIKey == "" {
 		s.T().Skip("OPEN_API_TOKEN is not set; skipping OpenAI MCP integration test")
 	}
@@ -97,19 +117,75 @@ func (s *MCPIntegrationSuite) TestOpenAIWithMCPTool() {
 		model.WithModel("gpt-5-mini"),
 		model.WithReasoningLevel(model.ReasoningLevelLow),
 		model.WithMaxTokens(512),
-		s.mcpOption(),
+		s.mcpOptionWithHeader(),
 	}
 	if s.openAIBaseURL != "" {
 		opts = append(opts, model.WithURL(s.openAIBaseURL))
 	}
 
-	generator, err := openai_response.NewStringContentGenerator(mcpPrompt, opts...)
+	generator, err := openai.NewStringContentGenerator(mcpPrompt, opts...)
 	require.NoError(s.T(), err)
 
 	output, metadata, err := generator.Generate(ctx)
 	require.NoError(s.T(), err)
 	s.assertContainsNeedle(output)
-	assert.Equal(s.T(), "openai_response", metadata[model.MetadataKeyProvider])
+	assert.Equal(s.T(), "openai", metadata[model.MetadataKeyProvider])
+}
+
+func (s *MCPIntegrationSuite) TestOpenAIWithMCPToolConfigAuthToken() {
+	if s.openAIKey == "" {
+		s.T().Skip("OPEN_API_TOKEN is not set; skipping OpenAI MCP integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
+	defer cancel()
+
+	opts := []model.GeneratorOption{
+		model.WithAuthToken(s.openAIKey),
+		model.WithModel("gpt-5-mini"),
+		model.WithReasoningLevel(model.ReasoningLevelLow),
+		model.WithMaxTokens(512),
+		s.mcpOptionWithAuthToken(),
+	}
+	if s.openAIBaseURL != "" {
+		opts = append(opts, model.WithURL(s.openAIBaseURL))
+	}
+
+	generator, err := openai.NewStringContentGenerator(mcpPrompt, opts...)
+	require.NoError(s.T(), err)
+
+	output, metadata, err := generator.Generate(ctx)
+	require.NoError(s.T(), err)
+	s.assertContainsNeedle(output)
+	assert.Equal(s.T(), "openai", metadata[model.MetadataKeyProvider])
+}
+
+// TestAnthropicWithMCPTool todo, fix this up
+func (s *MCPIntegrationSuite) TestAnthropicWithMCPTool() {
+	if s.anthropicKey == "" {
+		s.T().Skip("ANTHROPIC_API_KEY is not set; skipping Anthropic MCP integration test")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
+	defer cancel()
+
+	opts := []model.GeneratorOption{
+		model.WithAuthToken(s.anthropicKey),
+		model.WithModel(s.anthropicModel),
+		model.WithMaxTokens(512),
+		s.mcpOptionWithAuthToken(),
+	}
+	if s.anthropicBaseURL != "" {
+		opts = append(opts, model.WithURL(s.anthropicBaseURL))
+	}
+
+	generator, err := anthropic.NewStringContentGenerator(mcpPrompt, opts...)
+	require.NoError(s.T(), err)
+
+	output, metadata, err := generator.Generate(ctx)
+	require.NoError(s.T(), err)
+	s.assertContainsNeedle(output)
+	assert.Equal(s.T(), "anthropic", metadata[model.MetadataKeyProvider])
 }
 
 func (s *MCPIntegrationSuite) TestGeminiWithMCPTool() {
@@ -125,7 +201,7 @@ func (s *MCPIntegrationSuite) TestGeminiWithMCPTool() {
 		model.WithModel("gemini-2.5-flash"),
 		model.WithReasoningLevel(model.ReasoningLevelMed),
 		model.WithMaxTokens(1024),
-		s.mcpOption(),
+		s.mcpOptionWithHeader(),
 	}
 	if s.geminiBaseURL != "" {
 		opts = append(opts, model.WithURL(s.geminiBaseURL))
@@ -158,7 +234,7 @@ func (s *MCPIntegrationSuite) TestBedrockWithMCPTool() {
 		model.WithModel(bedrockTestModel),
 		model.WithMaxTokens(512),
 		model.WithTemperature(0.2),
-		s.mcpOption(),
+		s.mcpOptionWithHeader(),
 	}
 
 	generator, err := bedrock.NewStringContentGenerator(mcpPrompt, opts...)
@@ -181,7 +257,7 @@ func (s *MCPIntegrationSuite) TestOllamaWithMCPTool() {
 
 	opts := []model.GeneratorOption{
 		model.WithModel(s.ollamaChatModel),
-		s.mcpOption(),
+		s.mcpOptionWithHeader(),
 	}
 	if s.ollamaBaseURL != "" {
 		opts = append(opts, model.WithURL(s.ollamaBaseURL))

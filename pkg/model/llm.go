@@ -5,32 +5,16 @@ import (
 	"encoding/json"
 )
 
-// These are factory methods each llm provider should implement to create content generators.
-
 // NewStructureContentGeneratorFunc is for generators that produce structured output (i.e. JSON that can be unmarshaled into a struct).
 type NewStructureContentGeneratorFunc[T any] func(prompt string, opts ...GeneratorOption) (ContentGenerator[T], error)
 
 // NewStringContentGeneratorFunc is for generators that produce simple string output.
 type NewStringContentGeneratorFunc func(prompt string, opts ...GeneratorOption) (ContentGenerator[string], error)
 
-// NewEmbeddingGeneratorFunc is for generators that produce a single embedding vector.
-type NewEmbeddingGeneratorFunc func(input string, opts ...GeneratorOption) (EmbeddingGenerator, error)
-
-// NewBatchEmbeddingGeneratorFunc is for generators that produce embeddings for multiple inputs.
-type NewBatchEmbeddingGeneratorFunc func(inputs []string, opts ...GeneratorOption) (EmbeddingGenerator, error)
-
 type ContentGenerator[T any] interface {
 	Generate(ctx context.Context) (T, GenerationMetadata, error)
 	AddPromptContext(ctx context.Context, messageType ContextMessageType, content string)
 	AddPromptContextProvider(ctx context.Context, provider PromptContextProvider)
-}
-
-type EmbeddingVector = []float64
-type EmbeddingVectors = [][]float64
-
-type EmbeddingGenerator interface {
-	Generate(ctx context.Context) (EmbeddingVector, GenerationMetadata, error)
-	GenerateBatch(ctx context.Context) (EmbeddingVectors, GenerationMetadata, error)
 }
 
 type GenerationMetadata map[string]string
@@ -48,8 +32,6 @@ const (
 	MetadataKeyToolRounds        = "tool_rounds"
 	MetadataKeyResponseID        = "response_id"
 	MetadataKeyResponseStatus    = "response_status"
-	MetadataKeyEmbeddingCount    = "embedding_count"
-	MetadataKeyEmbeddingDims     = "embedding_dims"
 )
 
 type PromptContext struct {
@@ -121,6 +103,8 @@ type Tool struct {
 type MCPTool struct {
 	URL         string
 	Name        string
+	// AuthToken is used by providers that require MCP auth outside HTTPHeaders (for example, Anthropic authorization_token).
+	AuthToken   string
 	HTTPHeaders map[string]string
 	// AllowedTools restricts exposed MCP tools. If omitted, all server tools are discovered and used.
 	AllowedTools []string
@@ -163,12 +147,6 @@ func WithTemperature(value float64) GeneratorOption {
 func WithMaxTokens(value int) GeneratorOption {
 	return generatorOptionFunc(func(cfg *GeneratorConfig) {
 		cfg.MaxTokens = &value
-	})
-}
-
-func WithEmbeddingDimensions(value int) GeneratorOption {
-	return generatorOptionFunc(func(cfg *GeneratorConfig) {
-		cfg.EmbeddingDimensions = &value
 	})
 }
 

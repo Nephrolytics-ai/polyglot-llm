@@ -30,6 +30,7 @@ jobs:
     env:
       OPEN_API_TOKEN: ${{ secrets.OPEN_API_TOKEN }}
       GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       AWS_ACCESS_KEY_ID: ${{ secrets.DEV_AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.DEV_AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: ${{ secrets.DEV_AWS_REGION }}

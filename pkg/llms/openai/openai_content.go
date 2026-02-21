@@ -1,4 +1,4 @@
-package openai_response
+package openai
 
 import (
 	"context"
@@ -24,7 +24,7 @@ import (
 const (
 	defaultModelName = "gpt-5-mini"
 	maxToolRounds    = 12
-	providerName     = "openai_response"
+	providerName     = "openai"
 )
 
 type toolHandler func(ctx context.Context, args json.RawMessage) (any, error)
@@ -101,7 +101,7 @@ func (g *structuredGenerator[T]) AddPromptContext(ctx context.Context, messageTy
 		Content:     content,
 	})
 	log.Debugf(
-		"openai_response.structuredGenerator.AddPromptContext total_contexts=%d",
+		"openai.structuredGenerator.AddPromptContext total_contexts=%d",
 		len(g.promptContexts),
 	)
 }
@@ -115,7 +115,7 @@ func (g *structuredGenerator[T]) AddPromptContextProvider(ctx context.Context, p
 	defer g.promptContextMu.Unlock()
 	g.promptContextProviders = append(g.promptContextProviders, provider)
 	logging.NewLogger(ctx).Debugf(
-		"openai_response.structuredGenerator.AddPromptContextProvider total_providers=%d",
+		"openai.structuredGenerator.AddPromptContextProvider total_providers=%d",
 		len(g.promptContextProviders),
 	)
 }
@@ -215,7 +215,7 @@ func (g *textGenerator) AddPromptContext(ctx context.Context, messageType model.
 		Content:     content,
 	})
 	log.Debugf(
-		"openai_response.textGenerator.AddPromptContext total_contexts=%d",
+		"openai.textGenerator.AddPromptContext total_contexts=%d",
 		len(g.promptContexts),
 	)
 }
@@ -229,7 +229,7 @@ func (g *textGenerator) AddPromptContextProvider(ctx context.Context, provider m
 	defer g.promptContextMu.Unlock()
 	g.promptContextProviders = append(g.promptContextProviders, provider)
 	logging.NewLogger(ctx).Debugf(
-		"openai_response.textGenerator.AddPromptContextProvider total_providers=%d",
+		"openai.textGenerator.AddPromptContextProvider total_providers=%d",
 		len(g.promptContextProviders),
 	)
 }
@@ -703,7 +703,8 @@ func mapMCPTools(ctx context.Context, tools []model.MCPTool) ([]responses.ToolUn
 			return nil, utils.WrapIfNotNil(fmt.Errorf("mcp tool URL is required for %q", tool.Name))
 		}
 
-		authorization := extractAuthorization(tool.HTTPHeaders)
+		headers := mcpHeadersWithAuthToken(tool.HTTPHeaders, tool.AuthToken)
+		authorization := extractAuthorization(headers)
 		allowedTools := append([]string(nil), tool.AllowedTools...)
 		if len(allowedTools) == 0 {
 			discoveredTools, err := mcp.FetchListOfTools(ctx, tool.URL, authorization)
@@ -718,7 +719,7 @@ func mapMCPTools(ctx context.Context, tools []model.MCPTool) ([]responses.ToolUn
 		param := responses.ToolMcpParam{
 			ServerLabel: tool.Name,
 			ServerURL:   openai.String(tool.URL),
-			Headers:     copyHeaders(tool.HTTPHeaders),
+			Headers:     headers,
 			Type:        "mcp",
 		}
 		if len(allowedTools) > 0 {
@@ -741,6 +742,21 @@ func mapMCPTools(ctx context.Context, tools []model.MCPTool) ([]responses.ToolUn
 	}
 
 	return responseTools, nil
+}
+
+func mcpHeadersWithAuthToken(headers map[string]string, authToken string) map[string]string {
+	effective := copyHeaders(headers)
+	if strings.TrimSpace(authToken) == "" {
+		return effective
+	}
+	if extractAuthorization(effective) != "" {
+		return effective
+	}
+	if effective == nil {
+		effective = map[string]string{}
+	}
+	effective["Authorization"] = "Bearer " + strings.TrimSpace(authToken)
+	return effective
 }
 
 func extractAuthorization(headers map[string]string) string {

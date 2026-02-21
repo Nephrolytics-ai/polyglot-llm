@@ -212,7 +212,7 @@ func initializeAndListTools(ctx context.Context, c toolClient) ([]mcp.Tool, erro
 	initRequest := mcp.InitializeRequest{}
 	initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
 	initRequest.Params.ClientInfo = mcp.Implementation{
-		Name:    "Nephrolytics MCP Tool Adapter",
+		Name:    "Polyglot LLM MCP Tool Adapter",
 		Version: "1.0.0",
 	}
 	initRequest.Params.Capabilities = mcp.ClientCapabilities{}

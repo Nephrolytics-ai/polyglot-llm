@@ -14,44 +14,21 @@ import (
 )
 
 type embeddingGenerator struct {
-	inputs []string
-	cfg    model.GeneratorConfig
+	cfg model.GeneratorConfig
 }
 
-func NewEmbeddingGenerator(input string, opts ...model.GeneratorOption) (model.EmbeddingGenerator, error) {
-	err := validateEmbeddingInputs([]string{input})
-	if err != nil {
-		return nil, utils.WrapIfNotNil(err)
-	}
-
+func NewEmbeddingGenerator(opts ...model.GeneratorOption) (model.EmbeddingGenerator, error) {
 	cfg := model.ResolveGeneratorOpts(opts...)
 	return &embeddingGenerator{
-		inputs: []string{input},
-		cfg:    cfg,
+		cfg: cfg,
 	}, nil
 }
 
-func NewBatchEmbeddingGenerator(inputs []string, opts ...model.GeneratorOption) (model.EmbeddingGenerator, error) {
-	err := validateEmbeddingInputs(inputs)
-	if err != nil {
-		return nil, utils.WrapIfNotNil(err)
-	}
-
-	cfg := model.ResolveGeneratorOpts(opts...)
-	return &embeddingGenerator{
-		inputs: append([]string(nil), inputs...),
-		cfg:    cfg,
-	}, nil
-}
-
-func (g *embeddingGenerator) Generate(ctx context.Context) (model.EmbeddingVector, model.GenerationMetadata, error) {
-	if len(g.inputs) != 1 {
-		return nil, nil, utils.WrapIfNotNil(
-			fmt.Errorf("Generate requires exactly one input; got %d (use GenerateBatch for multiple inputs)", len(g.inputs)),
-		)
-	}
-
-	vectors, meta, err := g.GenerateBatch(ctx)
+func (g *embeddingGenerator) Generate(
+	ctx context.Context,
+	input string,
+) (model.EmbeddingVector, model.GenerationMetadata, error) {
+	vectors, meta, err := g.GenerateBatch(ctx, []string{input})
 	if err != nil {
 		return nil, meta, utils.WrapIfNotNil(err)
 	}
@@ -61,14 +38,17 @@ func (g *embeddingGenerator) Generate(ctx context.Context) (model.EmbeddingVecto
 	return vectors[0], meta, nil
 }
 
-func (g *embeddingGenerator) GenerateBatch(ctx context.Context) (model.EmbeddingVectors, model.GenerationMetadata, error) {
+func (g *embeddingGenerator) GenerateBatch(
+	ctx context.Context,
+	inputs []string,
+) (model.EmbeddingVectors, model.GenerationMetadata, error) {
 	start := time.Now()
 	modelName := resolveEmbeddingModelName(g.cfg)
 	meta := initMetadata(modelName)
 	defer setLatencyMetadata(meta, start)
 
 	log := logging.NewLogger(ctx)
-	err := validateEmbeddingInputs(g.inputs)
+	err := validateEmbeddingInputs(inputs)
 	if err != nil {
 		log.Errorf("error: %v", err)
 		return nil, meta, utils.WrapIfNotNil(err)
@@ -86,8 +66,8 @@ func (g *embeddingGenerator) GenerateBatch(ctx context.Context) (model.Embedding
 		return nil, meta, utils.WrapIfNotNil(err)
 	}
 
-	contents := make([]*genai.Content, 0, len(g.inputs))
-	for _, input := range g.inputs {
+	contents := make([]*genai.Content, 0, len(inputs))
+	for _, input := range inputs {
 		contents = append(contents, genai.NewContentFromText(input, genai.RoleUser))
 	}
 
@@ -99,7 +79,7 @@ func (g *embeddingGenerator) GenerateBatch(ctx context.Context) (model.Embedding
 
 	log.Infof(
 		"embedding_request inputs=%d model=%q dimensions=%v",
-		len(g.inputs),
+		len(inputs),
 		modelName,
 		g.cfg.EmbeddingDimensions,
 	)
@@ -110,7 +90,7 @@ func (g *embeddingGenerator) GenerateBatch(ctx context.Context) (model.Embedding
 		return nil, meta, utils.WrapIfNotNil(err)
 	}
 
-	vectors, err := convertEmbeddingResponse(response, len(g.inputs))
+	vectors, err := convertEmbeddingResponse(response, len(inputs))
 	if err != nil {
 		log.Errorf("error: %v", err)
 		return nil, meta, utils.WrapIfNotNil(err)

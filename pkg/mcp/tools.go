@@ -52,7 +52,7 @@ func actuallyFetchListOfTools(ctx context.Context, serverURL string, authToken s
 	initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
 
 	initRequest.Params.ClientInfo = mcp.Implementation{
-		Name:    "Nephrolytics AI Helper",
+		Name:    "Polyglot LLM AI Helper",
 		Version: "1.0.0",
 	}
 	initRequest.Params.Capabilities = mcp.ClientCapabilities{}
