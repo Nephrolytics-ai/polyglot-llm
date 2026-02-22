@@ -1,7 +1,7 @@
 # polyglot-llm
 # Purpose
 This is an open source LLM wrapper library in Go. 
-It provides a common interface for interacting with different LLM providers, such as OpenAI, Anthropic, HuggingFace, and Azure. The goal is to make it easy to switch between different LLM providers without having to change your code.
+It provides a common interface for interacting with different LLM providers, such as OpenAI, Anthropic, and HuggingFace. The goal is to make it easy to switch between different LLM providers without having to change your code.
 
 This software is provided open by Nephrolytics and is intended to be used by anyone who wants to use LLMs in their projects. We welcome contributions and feedback from the community.
 
