@@ -159,6 +159,7 @@ if err != nil {
 
 Integration tests in this repo follow a shared pattern:
 
+- New provider requirement: any new LLM provider added under `pkg/llms/<provider>` is expected to include integration tests under `tests` (for example, `tests/<provider>_integration_test.go`).
 - Base suite: embed `ExternalDependenciesSuite` from `tests/base_suite_test.go`.
   - Loads `SETTINGS_FILE` if set.
   - Otherwise attempts `$HOME/.env` (no failure if missing).
@@ -170,6 +171,7 @@ Integration tests in this repo follow a shared pattern:
   - For text outputs, assert stable substrings or non-empty normalized output.
   - For embeddings, assert count/dimension metadata and vector lengths.
 - Keep external test credentials behind env vars documented in `tests/README.md`.
+- If you need secrets/credentials to run new provider integration tests, work with maintainers to get them through an approved channel. Do not hardcode secrets and do not commit credentials to the repository.
 
 ## Contributor checklist
 
@@ -181,4 +183,5 @@ Before opening a PR:
 4. Keep changes scoped to the task; do not modify unrelated files.
 5. Add/update tests using testify suite patterns.
 6. For integration tests, gate on env vars and skip cleanly when unavailable.
-7. Run `gofmt` on edited Go files.
+7. For new `pkg/llms/<provider>` implementations, include integration tests and coordinate with maintainers if secrets are needed.
+8. Run `gofmt` on edited Go files.
