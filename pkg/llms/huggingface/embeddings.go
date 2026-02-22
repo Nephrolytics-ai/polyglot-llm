@@ -33,7 +33,7 @@ type featureExtractionOptions struct {
 
 func NewEmbeddingGenerator(opts ...model.GeneratorOption) (model.EmbeddingGenerator, error) {
 	cfg := model.ResolveGeneratorOpts(opts...)
-	client, err := newEmbeddingAPIClient(cfg)
+	client, err := newAPIClient(cfg)
 	if err != nil {
 		return nil, utils.WrapIfNotNil(err)
 	}
@@ -122,7 +122,7 @@ func (c *apiClient) featureExtraction(ctx context.Context, modelName string, inp
 		return nil, utils.WrapIfNotNil(err)
 	}
 
-	endpoint := c.baseURL + "/models/" + modelName
+	endpoint := c.baseURL + "/hf-inference/models/" + modelName
 
 	httpRequest, err := http.NewRequestWithContext(
 		ctx,

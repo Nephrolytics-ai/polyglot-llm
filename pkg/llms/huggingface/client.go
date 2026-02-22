@@ -23,13 +23,11 @@ const (
 	defaultModelName          = "Qwen/Qwen2.5-72B-Instruct"
 	defaultEmbeddingModelName = "BAAI/bge-base-en-v1.5"
 	defaultBaseURL            = "https://router.huggingface.co"
-	defaultEmbeddingBaseURL   = "https://router.huggingface.co/hf-inference"
 	defaultMaxTokens          = 1024
 	maxToolRounds             = 12
 	defaultHTTPTimeout        = 90 * time.Second
 	envHFToken                = "HF_TOKEN"
 	envHFBaseURL              = "HF_BASE_URL"
-	envHFEmbeddingBaseURL     = "HF_EMBEDDING_BASE_URL"
 	envHFModel                = "HF_MODEL"
 )
 
@@ -125,31 +123,6 @@ func newAPIClient(cfg model.GeneratorConfig) (*apiClient, error) {
 	}
 	if baseURL == "" {
 		baseURL = defaultBaseURL
-	}
-	baseURL = strings.TrimSuffix(baseURL, "/")
-
-	return &apiClient{
-		httpClient: &http.Client{Timeout: defaultHTTPTimeout},
-		baseURL:    baseURL,
-		apiKey:     apiKey,
-	}, nil
-}
-
-func newEmbeddingAPIClient(cfg model.GeneratorConfig) (*apiClient, error) {
-	apiKey := strings.TrimSpace(cfg.AuthToken)
-	if apiKey == "" {
-		apiKey = strings.TrimSpace(os.Getenv(envHFToken))
-	}
-	if apiKey == "" {
-		return nil, utils.WrapIfNotNil(errors.New("auth token is required (set WithAuthToken or HF_TOKEN)"))
-	}
-
-	baseURL := strings.TrimSpace(cfg.URL)
-	if baseURL == "" {
-		baseURL = strings.TrimSpace(os.Getenv(envHFEmbeddingBaseURL))
-	}
-	if baseURL == "" {
-		baseURL = defaultEmbeddingBaseURL
 	}
 	baseURL = strings.TrimSuffix(baseURL, "/")
 
