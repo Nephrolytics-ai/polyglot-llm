@@ -45,6 +45,13 @@ Audio usage:
 
 - `Generate(ctx context.Context) (string, model.GenerationMetadata, error)`
 
+`model.AudioOptions` notes:
+
+- `Keywords []model.AudioKeyword` can be provided for domain-specific transcription hints.
+- When `AudioOptions.Prompt` is empty, providers may add keyword hints as:
+  - `Common missed words: <json-array-of-audio-keywords>`
+- When `AudioOptions.Prompt` is set, that prompt is used as-is and keyword hints are not appended.
+
 ## Implemented LLM Providers
 | Provider | Package | Content Generation (String + Structured) | Embeddings | Audio | Tools | MCP |
 | --- | --- | --- | --- | --- | --- | --- |

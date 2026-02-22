@@ -1,6 +1,8 @@
 package gemini
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/model"
@@ -46,20 +48,64 @@ func (s *AudioTranscriptionGeneratorSuite) TestResolveAudioMIMETypeUnsupportedEx
 	s.Contains(err.Error(), "unsupported audio")
 }
 
-func (s *AudioTranscriptionGeneratorSuite) TestBuildWordsToWatchPromptUsesKeywordMapKeys() {
-	prompt := buildWordsToWatchPrompt(map[string]string{
-		"egfr": "estimated glomerular filtration rate",
-		"afib": "atrial fibrillation",
+func (s *AudioTranscriptionGeneratorSuite) TestBuildCommonMissedWordsPromptUsesKeywordStructs() {
+	prompt, err := buildCommonMissedWordsPrompt([]model.AudioKeyword{
+		{
+			Word:           "losartan",
+			CommonMistypes: []string{"losarton"},
+			Definition:     "An angiotensin II receptor blocker (ARB) used to treat high blood pressure.",
+		},
 	})
+	s.Require().NoError(err)
 
-	s.Equal("afib, egfr", prompt)
+	s.Equal(
+		`Common missed words: [{"word":"losartan","common_mistypes":["losarton"],"definition":"An angiotensin II receptor blocker (ARB) used to treat high blood pressure."}]`,
+		prompt,
+	)
 }
 
 func (s *AudioTranscriptionGeneratorSuite) TestBuildAudioTranscriptionPromptIncludesKeywords() {
-	prompt := buildAudioTranscriptionPrompt(map[string]string{
-		"egfr": "estimated glomerular filtration rate",
+	prompt, err := buildAudioTranscriptionPrompt(model.AudioOptions{
+		Keywords: []model.AudioKeyword{
+			{
+				Word:           "egfr",
+				CommonMistypes: []string{"e g f r"},
+				Definition:     "Estimated glomerular filtration rate.",
+			},
+		},
 	})
+	s.Require().NoError(err)
 
 	s.Contains(prompt, "Transcribe this audio accurately")
-	s.Contains(prompt, "egfr")
+	s.Contains(prompt, "Common missed words:")
+	s.Contains(prompt, "\"word\":\"egfr\"")
+}
+
+func (s *AudioTranscriptionGeneratorSuite) TestBuildAudioTranscriptionPromptUsesCustomPrompt() {
+	prompt, err := buildAudioTranscriptionPrompt(model.AudioOptions{
+		Prompt: "Use this exact audio prompt.",
+		Keywords: []model.AudioKeyword{
+			{Word: "should-not-appear"},
+		},
+	})
+	s.Require().NoError(err)
+	s.Equal("Use this exact audio prompt.", prompt)
+}
+
+func (s *AudioTranscriptionGeneratorSuite) TestBuildCommonMissedWordsPromptSkipsEmptyKeywordEntries() {
+	prompt, err := buildCommonMissedWordsPrompt([]model.AudioKeyword{
+		{},
+		{
+			Word:           " creatinine ",
+			CommonMistypes: []string{" ", "creatnine"},
+		},
+	})
+	s.Require().NoError(err)
+
+	payload := strings.TrimPrefix(prompt, "Common missed words: ")
+	var parsed []model.AudioKeyword
+	s.Require().NoError(json.Unmarshal([]byte(payload), &parsed))
+	s.Require().Len(parsed, 1)
+	s.Equal("creatinine", parsed[0].Word)
+	s.Equal([]string{"creatnine"}, parsed[0].CommonMistypes)
 }
