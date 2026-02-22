@@ -113,6 +113,7 @@ Providers may add additional keys, but these should remain stable.
 | Gemini | `pkg/llms/gemini` | Yes | Yes | `WithAuthToken` or env `GEMINI_KEY` | `WithURL` -> `genai.HTTPOptions.BaseURL` | `google.golang.org/genai`: `Models.GenerateContent`, `Models.EmbedContent` | Uses MCP Tool Adapter (`pkg/mcp`) to bridge MCP into normal tool calls |
 | Bedrock | `pkg/llms/bedrock` | Yes | No | Env only: `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` (optional `AWS_SESSION_TOKEN`) OR `AWS_PROFILE`; region from `AWS_REGION` (default `us-east-1`) | `WithURL` -> Bedrock `BaseEndpoint` override | `aws-sdk-go-v2/service/bedrockruntime`: `Converse` | Uses MCP Tool Adapter (`pkg/mcp`) to bridge MCP into normal tool calls |
 | Ollama | `pkg/llms/ollama` | Yes | Yes | None required | `WithURL`, else `OLLAMA_BASE_URL`, else `http://localhost:11434` | Native HTTP `/api/chat` (including tool loop), `/api/embed` with fallback `/api/embeddings` | Uses MCP Tool Adapter (`pkg/mcp`) to bridge MCP into normal tool calls |
+| HuggingFace | `pkg/llms/huggingface` | Yes | Yes | `WithAuthToken` or env `HF_TOKEN` | `WithURL`, else `HF_BASE_URL`, else `https://router.huggingface.co` | Raw HTTP: `/v1/chat/completions` (OpenAI-compatible) for generation, `/hf-inference/models/{model}` (native HF feature-extraction) for embeddings | Uses MCP Tool Adapter (`pkg/mcp`) to bridge MCP into normal tool calls |
 | Anthopic (scaffold) | `pkg/llms/anthopic` | Constructors exist; `Generate` currently returns not-implemented errors | No | Not implemented | Not implemented | Not implemented | Not implemented |
 
 ## OpenAI Responses Details
@@ -156,9 +157,20 @@ Providers may add additional keys, but these should remain stable.
 - Embeddings use `/api/embed`; fallback to `/api/embeddings` for older Ollama servers.
 - MCP tools are converted into local tools through `pkg/mcp.ToolAdapter`.
 
+## HuggingFace Details
+
+- Uses raw HTTP against HuggingFace's `router.huggingface.co` (no external SDK dependency).
+- Content generation (string, structured, tool calling) uses the OpenAI-compatible `/v1/chat/completions` endpoint.
+- Embeddings use the native HF Inference API feature-extraction pipeline at `/hf-inference/models/{model}`.
+  - Response parsing handles multiple formats: 2D arrays (sentence-level from TEI-served models), 1D arrays (single input edge case), and 3D arrays (token-level from raw transformer models, mean-pooled to sentence vectors).
+- Default generation model: `Qwen/Qwen2.5-72B-Instruct`. Default embedding model: `BAAI/bge-base-en-v1.5`.
+- Supports `WithTemperature` and `WithMaxTokens`. `WithReasoningLevel` is not supported (returns error or warns depending on `WithIgnoreInvalidGeneratorOptions`).
+- MCP tools are converted into local tools through `pkg/mcp.ToolAdapter`.
+- Audio transcription is not supported (returns unsupported error).
+
 ## MCP Tool Adapter (`pkg/mcp`)
 
-Providers that do not support MCP natively (Gemini, Bedrock, Ollama) use `ToolAdapter`:
+Providers that do not support MCP natively (Gemini, Bedrock, Ollama, HuggingFace) use `ToolAdapter`:
 
 - Connect to MCP server via streamable HTTP transport.
 - Initialize and list tools.

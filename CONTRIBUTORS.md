@@ -7,7 +7,7 @@ This guide documents the coding patterns used in this repository so new contribu
 - `pkg/model`
   - Provider-agnostic contracts and options (`ContentGenerator`, `EmbeddingGenerator`, `AudioTranscriptionGenerator`, `GeneratorOption`, metadata keys).
 - `pkg/llms/<provider>`
-  - Provider implementations (`openai`, `anthropic`, `bedrock`, `gemini`, `ollama`).
+  - Provider implementations (`openai`, `anthropic`, `bedrock`, `gemini`, `ollama`, `huggingface`).
   - Each provider should expose constructors that match the `pkg/model` function prototypes.
 - `pkg/logging`
   - Shared logging abstraction (`Logger`) and factory (`NewLogger(ctx)` + optional custom factory).

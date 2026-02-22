@@ -1,7 +1,7 @@
 # polyglot-llm
 # Purpose
 This is an open source LLM wrapper library in Go. 
-It provides a common interface for interacting with different LLM providers, such as OpenAI, Anthropic, and Azure. The goal is to make it easy to switch between different LLM providers without having to change your code.
+It provides a common interface for interacting with different LLM providers, such as OpenAI, Anthropic, and HuggingFace. The goal is to make it easy to switch between different LLM providers without having to change your code.
 
 This software is provided open by Nephrolytics and is intended to be used by anyone who wants to use LLMs in their projects. We welcome contributions and feedback from the community.
 
@@ -60,13 +60,15 @@ Audio usage:
 | Bedrock | `pkg/llms/bedrock` | Yes | No | No | Yes | Tool-wrapped MCP (`pkg/mcp` adapter) |
 | Gemini | `pkg/llms/gemini` | Yes | Yes | Yes | Yes | Tool-wrapped MCP (`pkg/mcp` adapter) |
 | Ollama | `pkg/llms/ollama` | Yes | Yes | No | Yes | Tool-wrapped MCP (`pkg/mcp` adapter) |
+| HuggingFace | `pkg/llms/huggingface` | Yes | Yes | No | Yes | Tool-wrapped MCP (`pkg/mcp` adapter) |
 
 Notes:
 - OpenAI content generation (including tools and MCP) runs through the Responses API flow.
 - Tool-wrapped MCP means MCP endpoints are bridged into regular tool calls via `pkg/mcp` so providers without native MCP can still use MCP tools.
+- HuggingFace content generation uses the OpenAI-compatible `/v1/chat/completions` endpoint via `router.huggingface.co`. Embeddings use the native HF Inference API feature-extraction pipeline.
 
 ## Tool Wrapped MCP
-For providers that do not support MCP natively, this library uses a tool-wrapper approach to create the illusion of MCP support.
+For providers that do not support MCP natively (Gemini, Bedrock, Ollama, HuggingFace), this library uses a tool-wrapper approach to create the illusion of MCP support.
 
 How it works:
 
