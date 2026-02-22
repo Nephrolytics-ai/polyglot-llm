@@ -2,14 +2,14 @@
 
 ## Goals
 
-- Keep a single provider-agnostic abstraction for content generation and embeddings.
+- Keep a single provider-agnostic abstraction for content generation, embeddings, and audio transcription.
 - Keep provider implementations isolated under `pkg/llms/*`.
 - Support local tools and MCP tools.
 - Support prompt context accumulation from static messages and runtime providers.
 - Return normalized metadata for observability.
 - Return wrapped errors; never use `panic` or `fatal`.
 
-## Base Abstraction Layer (`pkg/model/llm.go`)
+## Base Abstraction Layer (`pkg/model/llm.go`, `pkg/model/embedding.go`, `pkg/model/audio.go`)
 
 This is the contract layer all providers implement.
 
@@ -18,6 +18,7 @@ This is the contract layer all providers implement.
 - `NewStructureContentGeneratorFunc[T any]`
 - `NewStringContentGeneratorFunc`
 - `NewEmbeddingGeneratorFunc`
+- `NewAudioTranscriptionGeneratorFunc`
 
 ### Core Interfaces
 
@@ -28,6 +29,8 @@ This is the contract layer all providers implement.
 - `EmbeddingGenerator`
   - `Generate(ctx context.Context, input string) (EmbeddingVector, GenerationMetadata, error)`
   - `GenerateBatch(ctx context.Context, inputs []string) (EmbeddingVectors, GenerationMetadata, error)`
+- `AudioTranscriptionGenerator`
+  - `Generate(ctx context.Context) (string, GenerationMetadata, error)`
 
 ### Prompt Context Model
 
@@ -55,6 +58,17 @@ All options are `GeneratorOption` and resolve into `GeneratorConfig`:
 - `WithReasoningLevel(ReasoningLevel)` where level is `none|low|med|high`
 - `WithTools([]Tool)`
 - `WithMCPTools([]MCPTool)`
+
+Audio-specific options are passed with `model.AudioOptions`:
+
+- `Prompt string`
+- `Keywords []model.AudioKeyword`
+
+Keyword prompt quirk:
+
+- If `AudioOptions.Prompt` is provided, providers use it directly and do not append keyword hints.
+- If `AudioOptions.Prompt` is empty and keywords are provided, providers may append:
+  - `Common missed words: <json-array-of-audio-keywords>`
 
 ### Tools and MCP Tools
 

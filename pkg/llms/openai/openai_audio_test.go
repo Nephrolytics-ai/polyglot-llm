@@ -2,6 +2,8 @@ package openai
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/model"
@@ -53,35 +55,68 @@ func (s *AudioTranscriptionGeneratorSuite) TestAudioGeneratorConfigFromOptionsMa
 
 func (s *AudioTranscriptionGeneratorSuite) TestCloneAudioOptionsCopiesKeywords() {
 	opts := model.AudioOptions{
-		Keywords: map[string]string{
-			"afib": "atrial fibrillation",
+		Keywords: []model.AudioKeyword{
+			{
+				Word:           "afib",
+				CommonMistypes: []string{"a fib", "afibb"},
+				Definition:     "Atrial fibrillation.",
+			},
 		},
 	}
 
 	cloned := cloneAudioOptions(opts)
-	cloned.Keywords["afib"] = "changed"
+	cloned.Keywords[0].Word = "changed"
+	cloned.Keywords[0].CommonMistypes[0] = "changed-mistype"
+	cloned.Keywords[0].Definition = "changed-definition"
 
-	s.Equal("atrial fibrillation", opts.Keywords["afib"])
-	s.Equal("changed", cloned.Keywords["afib"])
+	s.Equal("afib", opts.Keywords[0].Word)
+	s.Equal("a fib", opts.Keywords[0].CommonMistypes[0])
+	s.Equal("Atrial fibrillation.", opts.Keywords[0].Definition)
 }
 
-func (s *AudioTranscriptionGeneratorSuite) TestBuildWordsToWatchPromptUsesKeywordMapKeys() {
-	prompt := buildWordsToWatchPrompt(map[string]string{
-		"afib": "atrial fibrillation",
-		"htn":  "hypertension",
+func (s *AudioTranscriptionGeneratorSuite) TestBuildCommonMissedWordsPromptUsesKeywordStructs() {
+	prompt, err := buildCommonMissedWordsPrompt([]model.AudioKeyword{
+		{
+			Word:           "losartan",
+			CommonMistypes: []string{"losartan potassium", "losarton"},
+			Definition:     "An angiotensin II receptor blocker (ARB) used to treat high blood pressure.",
+		},
 	})
+	s.Require().NoError(err)
 
-	s.Equal("afib, htn", prompt)
+	s.Equal(
+		`Common missed words: [{"Word":"losartan","CommonMistypes":["losartan potassium","losarton"],"Definition":"An angiotensin II receptor blocker (ARB) used to treat high blood pressure."}]`,
+		prompt,
+	)
 }
 
-func (s *AudioTranscriptionGeneratorSuite) TestBuildWordsToWatchPromptSkipsEmptyKeys() {
-	prompt := buildWordsToWatchPrompt(map[string]string{
-		"":           "ignore",
-		"  ":         "ignore",
-		" creatine ": "creatinine",
+func (s *AudioTranscriptionGeneratorSuite) TestBuildCommonMissedWordsPromptSkipsEmptyKeywordEntries() {
+	prompt, err := buildCommonMissedWordsPrompt([]model.AudioKeyword{
+		{},
+		{
+			Word:           " creatinine ",
+			CommonMistypes: []string{" ", "creatnine"},
+		},
 	})
+	s.Require().NoError(err)
 
-	s.Equal("creatine", prompt)
+	payload := strings.TrimPrefix(prompt, "Common missed words: ")
+	var parsed []model.AudioKeyword
+	s.Require().NoError(json.Unmarshal([]byte(payload), &parsed))
+	s.Require().Len(parsed, 1)
+	s.Equal("creatinine", parsed[0].Word)
+	s.Equal([]string{"creatnine"}, parsed[0].CommonMistypes)
+}
+
+func (s *AudioTranscriptionGeneratorSuite) TestBuildAudioTranscriptionPromptUsesCustomPrompt() {
+	prompt, err := buildAudioTranscriptionPrompt(model.AudioOptions{
+		Prompt: "Use this exact audio prompt.",
+		Keywords: []model.AudioKeyword{
+			{Word: "should-not-appear"},
+		},
+	})
+	s.Require().NoError(err)
+	s.Equal("Use this exact audio prompt.", prompt)
 }
 
 func (s *AudioTranscriptionGeneratorSuite) TestApplyOpenAIAudioTranscriptionMetadataUsesTokenUsage() {

@@ -2,14 +2,24 @@ package model
 
 import "context"
 
+type AudioKeyword struct {
+	Word           string   `json:"Word"`
+	CommonMistypes []string `json:"CommonMistypes"`
+	Definition     string   `json:"Definition"`
+}
+
 type AudioOptions struct {
 	IgnoreInvalidGeneratorOptions bool
 	URL                           string
 	AuthToken                     string
 	Model                         string
-	// keywords to watch for in the transcript.  The key, is the word you want, the string is a comma separated list of common mistypes of the word to watch for.
-	//Not all models will handle this the same
-	Keywords map[string]string
+	// Prompt optionally overrides the provider's default audio prompt behavior.
+	// When Prompt is set, keyword hints are not appended.
+	Prompt string
+	// Keywords provides domain terms that may be missed in transcription.
+	// Providers may convert this into: "Common missed words: <json>"
+	// when Prompt is empty.
+	Keywords []AudioKeyword
 }
 
 // NewAudioTranscriptionGeneratorFunc creates an audio transcription generator for a source file.

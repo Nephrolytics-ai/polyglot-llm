@@ -54,9 +54,17 @@ func (s *OpenAIAudioIntegrationSuite) audioOptions() model.AudioOptions {
 		AuthToken: s.apiKey,
 		URL:       s.baseURL,
 		Model:     s.modelName,
-		Keywords: map[string]string{
-			"afib":       "atrial fibrillation",
-			"creatinine": "creatinine",
+		Keywords: []model.AudioKeyword{
+			{
+				Word:           "afib",
+				CommonMistypes: []string{"a fib", "afibb"},
+				Definition:     "Atrial fibrillation.",
+			},
+			{
+				Word:           "creatinine",
+				CommonMistypes: []string{"creatnine", "creatinin"},
+				Definition:     "A blood test marker used to assess kidney function.",
+			},
 		},
 	}
 }
@@ -109,9 +117,17 @@ func (s *GeminiAudioIntegrationSuite) audioOptions() model.AudioOptions {
 		AuthToken: s.apiKey,
 		URL:       s.baseURL,
 		Model:     s.modelName,
-		Keywords: map[string]string{
-			"egfr":       "estimated glomerular filtration rate",
-			"creatinine": "creatinine",
+		Keywords: []model.AudioKeyword{
+			{
+				Word:           "egfr",
+				CommonMistypes: []string{"e g f r", "gfr"},
+				Definition:     "Estimated glomerular filtration rate.",
+			},
+			{
+				Word:           "creatinine",
+				CommonMistypes: []string{"creatnine", "creatinin"},
+				Definition:     "A blood test marker used to assess kidney function.",
+			},
 		},
 	}
 }

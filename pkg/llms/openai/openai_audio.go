@@ -2,9 +2,9 @@ package openai
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -87,9 +87,12 @@ func (c *client) runAudioTranscription(
 		Model:          openai.AudioModel(resolveAudioTranscriptionModelName(opts)),
 		ResponseFormat: openai.AudioResponseFormatJSON,
 	}
-	wordsToWatch := buildWordsToWatchPrompt(opts.Keywords)
-	if wordsToWatch != "" {
-		params.Prompt = param.NewOpt(wordsToWatch)
+	prompt, err := buildAudioTranscriptionPrompt(opts)
+	if err != nil {
+		return "", nil, utils.WrapIfNotNil(err)
+	}
+	if prompt != "" {
+		params.Prompt = param.NewOpt(prompt)
 	}
 
 	response, err := c.apiClient.Audio.Transcriptions.New(ctx, params)
@@ -108,25 +111,63 @@ func (c *client) runAudioTranscription(
 	return transcript, response, nil
 }
 
-func buildWordsToWatchPrompt(keywords map[string]string) string {
-	if len(keywords) == 0 {
-		return ""
+func buildAudioTranscriptionPrompt(opts model.AudioOptions) (string, error) {
+	customPrompt := strings.TrimSpace(opts.Prompt)
+	if customPrompt != "" {
+		return customPrompt, nil
 	}
 
-	words := make([]string, 0, len(keywords))
-	for key := range keywords {
-		normalized := strings.TrimSpace(key)
-		if normalized == "" {
+	return buildCommonMissedWordsPrompt(opts.Keywords)
+}
+
+func buildCommonMissedWordsPrompt(keywords []model.AudioKeyword) (string, error) {
+	normalizedKeywords := normalizeAudioKeywords(keywords)
+	if len(normalizedKeywords) == 0 {
+		return "", nil
+	}
+
+	keywordsJSON, err := json.Marshal(normalizedKeywords)
+	if err != nil {
+		return "", err
+	}
+
+	return "Common missed words: " + string(keywordsJSON), nil
+}
+
+func normalizeAudioKeywords(keywords []model.AudioKeyword) []model.AudioKeyword {
+	if len(keywords) == 0 {
+		return nil
+	}
+
+	normalized := make([]model.AudioKeyword, 0, len(keywords))
+	for _, keyword := range keywords {
+		word := strings.TrimSpace(keyword.Word)
+		definition := strings.TrimSpace(keyword.Definition)
+		commonMistypes := make([]string, 0, len(keyword.CommonMistypes))
+		for _, candidate := range keyword.CommonMistypes {
+			candidate = strings.TrimSpace(candidate)
+			if candidate == "" {
+				continue
+			}
+			commonMistypes = append(commonMistypes, candidate)
+		}
+
+		if word == "" && definition == "" && len(commonMistypes) == 0 {
 			continue
 		}
-		words = append(words, normalized)
-	}
-	if len(words) == 0 {
-		return ""
+
+		normalized = append(normalized, model.AudioKeyword{
+			Word:           word,
+			CommonMistypes: commonMistypes,
+			Definition:     definition,
+		})
 	}
 
-	sort.Strings(words)
-	return strings.Join(words, ", ")
+	if len(normalized) == 0 {
+		return nil
+	}
+
+	return normalized
 }
 
 func resolveAudioTranscriptionModelName(opts model.AudioOptions) string {
@@ -160,9 +201,15 @@ func cloneAudioOptions(opts model.AudioOptions) model.AudioOptions {
 		return cloned
 	}
 
-	cloned.Keywords = make(map[string]string, len(opts.Keywords))
-	for source, target := range opts.Keywords {
-		cloned.Keywords[source] = target
+	cloned.Keywords = make([]model.AudioKeyword, len(opts.Keywords))
+	for i, keyword := range opts.Keywords {
+		clonedKeyword := keyword
+		if len(keyword.CommonMistypes) > 0 {
+			clonedKeyword.CommonMistypes = append([]string(nil), keyword.CommonMistypes...)
+		} else {
+			clonedKeyword.CommonMistypes = nil
+		}
+		cloned.Keywords[i] = clonedKeyword
 	}
 
 	return cloned
