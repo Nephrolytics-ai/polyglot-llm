@@ -3,9 +3,9 @@ package model
 import "context"
 
 type AudioKeyword struct {
-	Word           string   `json:"Word"`
-	CommonMistypes []string `json:"CommonMistypes"`
-	Definition     string   `json:"Definition"`
+	Word           string   `json:"word,omitempty"`
+	CommonMistypes []string `json:"common_mistypes,omitempty"`
+	Definition     string   `json:"definition,omitempty"`
 }
 
 
