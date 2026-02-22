@@ -85,7 +85,7 @@ func (s *AudioTranscriptionGeneratorSuite) TestBuildCommonMissedWordsPromptUsesK
 	s.Require().NoError(err)
 
 	s.Equal(
-		`Common missed words: [{"Word":"losartan","CommonMistypes":["losartan potassium","losarton"],"Definition":"An angiotensin II receptor blocker (ARB) used to treat high blood pressure."}]`,
+		`Common missed words: [{"word":"losartan","common_mistypes":["losartan potassium","losarton"],"definition":"An angiotensin II receptor blocker (ARB) used to treat high blood pressure."}]`,
 		prompt,
 	)
 }

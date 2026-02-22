@@ -59,7 +59,7 @@ func (s *AudioTranscriptionGeneratorSuite) TestBuildCommonMissedWordsPromptUsesK
 	s.Require().NoError(err)
 
 	s.Equal(
-		`Common missed words: [{"Word":"losartan","CommonMistypes":["losarton"],"Definition":"An angiotensin II receptor blocker (ARB) used to treat high blood pressure."}]`,
+		`Common missed words: [{"word":"losartan","common_mistypes":["losarton"],"definition":"An angiotensin II receptor blocker (ARB) used to treat high blood pressure."}]`,
 		prompt,
 	)
 }
@@ -78,7 +78,7 @@ func (s *AudioTranscriptionGeneratorSuite) TestBuildAudioTranscriptionPromptIncl
 
 	s.Contains(prompt, "Transcribe this audio accurately")
 	s.Contains(prompt, "Common missed words:")
-	s.Contains(prompt, "\"Word\":\"egfr\"")
+	s.Contains(prompt, "\"word\":\"egfr\"")
 }
 
 func (s *AudioTranscriptionGeneratorSuite) TestBuildAudioTranscriptionPromptUsesCustomPrompt() {

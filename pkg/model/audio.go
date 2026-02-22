@@ -1,13 +1,10 @@
 package model
 
-import "context"
-
 type AudioKeyword struct {
-	Word           string   `json:"word,omitempty"`
-	CommonMistypes []string `json:"common_mistypes,omitempty"`
-	Definition     string   `json:"definition,omitempty"`
+	Word           string   `json:"word"`
+	CommonMistypes []string `json:"common_mistypes"`
+	Definition     string   `json:"definition"`
 }
-
 
 type AudioOptions struct {
 	IgnoreInvalidGeneratorOptions bool
