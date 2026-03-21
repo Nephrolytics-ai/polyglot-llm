@@ -77,13 +77,6 @@ func (g *embeddingGenerator) GenerateBatch(
 		config.OutputDimensionality = &dims
 	}
 
-	log.Infof(
-		"embedding_request inputs=%d model=%q dimensions=%v",
-		len(inputs),
-		modelName,
-		g.cfg.EmbeddingDimensions,
-	)
-
 	response, err := client.Models.EmbedContent(ctx, modelName, contents, config)
 	if err != nil {
 		log.Errorf("error: %v", err)

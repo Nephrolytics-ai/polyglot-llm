@@ -75,13 +75,6 @@ func (g *embeddingGenerator) GenerateBatch(
 		return nil, meta, utils.WrapIfNotNil(err)
 	}
 
-	log.Infof(
-		"embedding_request inputs=%d model=%q base_url=%q",
-		len(inputs),
-		modelName,
-		g.client.baseURL,
-	)
-
 	vectors, err := g.client.featureExtraction(ctx, modelName, inputs)
 	if err != nil {
 		log.Errorf("error: %v", err)

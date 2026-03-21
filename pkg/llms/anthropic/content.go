@@ -18,6 +18,7 @@ import (
 type structuredGenerator[T any] struct {
 	client                 *apiClient
 	prompt                 string
+	LastOutput             string
 	cfg                    model.GeneratorConfig
 	promptContextMu        sync.RWMutex
 	promptContexts         []*model.PromptContext
@@ -27,10 +28,27 @@ type structuredGenerator[T any] struct {
 type textGenerator struct {
 	client                 *apiClient
 	prompt                 string
+	LastOutput             string
 	cfg                    model.GeneratorConfig
 	promptContextMu        sync.RWMutex
 	promptContexts         []*model.PromptContext
 	promptContextProviders []model.PromptContextProvider
+}
+
+type structuredGeneratorView[T any] struct {
+	*structuredGenerator[T]
+}
+
+func (g *structuredGeneratorView[T]) LastOutput() string {
+	return g.structuredGenerator.LastOutput
+}
+
+type textGeneratorView struct {
+	*textGenerator
+}
+
+func (g *textGeneratorView) LastOutput() string {
+	return g.textGenerator.LastOutput
 }
 
 func NewStructureContentGenerator[T any](prompt string, opts ...model.GeneratorOption) (model.ContentGenerator[T], error) {
@@ -44,10 +62,12 @@ func NewStructureContentGenerator[T any](prompt string, opts ...model.GeneratorO
 		return nil, utils.WrapIfNotNil(err)
 	}
 
-	return &structuredGenerator[T]{
-		client: client,
-		prompt: prompt,
-		cfg:    cfg,
+	return &structuredGeneratorView[T]{
+		structuredGenerator: &structuredGenerator[T]{
+			client: client,
+			prompt: prompt,
+			cfg:    cfg,
+		},
 	}, nil
 }
 
@@ -62,10 +82,12 @@ func NewStringContentGenerator(prompt string, opts ...model.GeneratorOption) (mo
 		return nil, utils.WrapIfNotNil(err)
 	}
 
-	return &textGenerator{
-		client: client,
-		prompt: prompt,
-		cfg:    cfg,
+	return &textGeneratorView{
+		textGenerator: &textGenerator{
+			client: client,
+			prompt: prompt,
+			cfg:    cfg,
+		},
 	}, nil
 }
 
@@ -124,6 +146,7 @@ func (g *textGenerator) AddPromptContextProvider(ctx context.Context, provider m
 func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, model.GenerationMetadata, error) {
 	start := time.Now()
 	log := logging.NewLogger(ctx)
+	g.LastOutput = ""
 
 	cfg, err := normalizeGeneratorOptionsForProvider(g.cfg, log)
 	if err != nil {
@@ -146,7 +169,7 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, model.Generat
 		return zero, meta, utils.WrapIfNotNil(err)
 	}
 
-	system, messages, contextCount, err := g.messagesWithContext(ctx, schemaInstruction)
+	system, messages, _, err := g.messagesWithContext(ctx, schemaInstruction)
 	if err != nil {
 		var zero T
 		return zero, meta, utils.WrapIfNotNil(err)
@@ -158,17 +181,6 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, model.Generat
 		return zero, meta, utils.WrapIfNotNil(err)
 	}
 	defer cleanup()
-
-	log.Infof(
-		"prompt=%q context_count=%d model=%q temperature=%v max_tokens=%v tools=%d mcp_tools=%d",
-		g.prompt,
-		contextCount,
-		modelName,
-		cfg.Temperature,
-		cfg.MaxTokens,
-		len(cfg.Tools),
-		len(cfg.MCPTools),
-	)
 
 	response, totals, err := runMessageFlow(ctx, g.client, cfg, modelName, system, messages, tools, handlers, mcpServers)
 	if err != nil {
@@ -184,8 +196,10 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, model.Generat
 		return zero, meta, utils.WrapIfNotNil(err)
 	}
 
+	payload := extractJSONPayload(text)
+	g.LastOutput = payload
 	var out T
-	err = json.Unmarshal([]byte(extractJSONPayload(text)), &out)
+	err = json.Unmarshal([]byte(payload), &out)
 	if err != nil {
 		var zero T
 		return zero, meta, utils.WrapIfNotNil(err)
@@ -196,6 +210,7 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, model.Generat
 func (g *textGenerator) Generate(ctx context.Context) (string, model.GenerationMetadata, error) {
 	start := time.Now()
 	log := logging.NewLogger(ctx)
+	g.LastOutput = ""
 
 	cfg, err := normalizeGeneratorOptionsForProvider(g.cfg, log)
 	if err != nil {
@@ -206,7 +221,7 @@ func (g *textGenerator) Generate(ctx context.Context) (string, model.GenerationM
 	meta := initMetadata(modelName)
 	defer setLatencyMetadata(meta, start)
 
-	system, messages, contextCount, err := g.messagesWithContext(ctx, "")
+	system, messages, _, err := g.messagesWithContext(ctx, "")
 	if err != nil {
 		return "", meta, utils.WrapIfNotNil(err)
 	}
@@ -216,17 +231,6 @@ func (g *textGenerator) Generate(ctx context.Context) (string, model.GenerationM
 		return "", meta, utils.WrapIfNotNil(err)
 	}
 	defer cleanup()
-
-	log.Infof(
-		"prompt=%q context_count=%d model=%q temperature=%v max_tokens=%v tools=%d mcp_tools=%d",
-		g.prompt,
-		contextCount,
-		modelName,
-		cfg.Temperature,
-		cfg.MaxTokens,
-		len(cfg.Tools),
-		len(cfg.MCPTools),
-	)
 
 	response, totals, err := runMessageFlow(ctx, g.client, cfg, modelName, system, messages, tools, handlers, mcpServers)
 	if err != nil {
@@ -240,6 +244,7 @@ func (g *textGenerator) Generate(ctx context.Context) (string, model.GenerationM
 		return "", meta, utils.WrapIfNotNil(err)
 	}
 
+	g.LastOutput = text
 	return text, meta, nil
 }
 

@@ -53,7 +53,9 @@ func NewStructureContentGenerator[T any](prompt string, opts ...model.GeneratorO
 	if err != nil {
 		return nil, utils.WrapIfNotNil(err)
 	}
-	return &structuredGenerator[T]{client: c, prompt: prompt, cfg: cfg}, nil
+	return &structuredGeneratorView[T]{
+		structuredGenerator: &structuredGenerator[T]{client: c, prompt: prompt, cfg: cfg},
+	}, nil
 }
 
 func NewStringContentGenerator(prompt string, opts ...model.GeneratorOption) (model.ContentGenerator[string], error) {
@@ -66,7 +68,9 @@ func NewStringContentGenerator(prompt string, opts ...model.GeneratorOption) (mo
 	if err != nil {
 		return nil, utils.WrapIfNotNil(err)
 	}
-	return &textGenerator{client: c, prompt: prompt, cfg: cfg}, nil
+	return &textGeneratorView{
+		textGenerator: &textGenerator{client: c, prompt: prompt, cfg: cfg},
+	}, nil
 }
 
 func newClient(cfg model.GeneratorConfig) (*client, error) {
@@ -85,10 +89,19 @@ func newClient(cfg model.GeneratorConfig) (*client, error) {
 type structuredGenerator[T any] struct {
 	client                 *client
 	prompt                 string
+	LastOutput             string
 	cfg                    model.GeneratorConfig
 	promptContextMu        sync.RWMutex
 	promptContexts         []*model.PromptContext
 	promptContextProviders []model.PromptContextProvider
+}
+
+type structuredGeneratorView[T any] struct {
+	*structuredGenerator[T]
+}
+
+func (g *structuredGeneratorView[T]) LastOutput() string {
+	return g.structuredGenerator.LastOutput
 }
 
 func (g *structuredGenerator[T]) AddPromptContext(ctx context.Context, messageType model.ContextMessageType, content string) {
@@ -124,26 +137,15 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, model.Generat
 	start := time.Now()
 	meta := initMetadata(providerName, resolveModelName(g.cfg))
 	defer setLatencyMetadata(meta, start)
+	g.LastOutput = ""
 
 	log := logging.NewLogger(ctx)
-	inputItems, contextCount, err := g.inputItemsWithContext(ctx)
+	inputItems, _, err := g.inputItemsWithContext(ctx)
 	if err != nil {
 		log.Errorf("error: %v", err)
 		var zero T
 		return zero, meta, utils.WrapIfNotNil(err)
 	}
-	log.Infof(
-		"prompt=%q context_count=%d input_items=%d model=%v temperature=%v max_tokens=%v reasoning=%v tools=%d mcp_tools=%d",
-		g.prompt,
-		contextCount,
-		len(inputItems),
-		g.cfg.Model,
-		g.cfg.Temperature,
-		g.cfg.MaxTokens,
-		g.cfg.ReasoningLevel,
-		len(g.cfg.Tools),
-		len(g.cfg.MCPTools),
-	)
 
 	schema, err := generateSchema[T]()
 	if err != nil {
@@ -185,6 +187,7 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, model.Generat
 		return zero, meta, utils.WrapIfNotNil(err)
 	}
 
+	g.LastOutput = output
 	var result T
 	err = json.Unmarshal([]byte(output), &result)
 	if err != nil {
@@ -199,10 +202,19 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, model.Generat
 type textGenerator struct {
 	client                 *client
 	prompt                 string
+	LastOutput             string
 	cfg                    model.GeneratorConfig
 	promptContextMu        sync.RWMutex
 	promptContexts         []*model.PromptContext
 	promptContextProviders []model.PromptContextProvider
+}
+
+type textGeneratorView struct {
+	*textGenerator
+}
+
+func (g *textGeneratorView) LastOutput() string {
+	return g.textGenerator.LastOutput
 }
 
 func (g *textGenerator) AddPromptContext(ctx context.Context, messageType model.ContextMessageType, content string) {
@@ -238,25 +250,14 @@ func (g *textGenerator) Generate(ctx context.Context) (string, model.GenerationM
 	start := time.Now()
 	meta := initMetadata(providerName, resolveModelName(g.cfg))
 	defer setLatencyMetadata(meta, start)
+	g.LastOutput = ""
 
 	log := logging.NewLogger(ctx)
-	inputItems, contextCount, err := g.inputItemsWithContext(ctx)
+	inputItems, _, err := g.inputItemsWithContext(ctx)
 	if err != nil {
 		log.Errorf("error: %v", err)
 		return "", meta, utils.WrapIfNotNil(err)
 	}
-	log.Infof(
-		"prompt=%q context_count=%d input_items=%d model=%v temperature=%v max_tokens=%v reasoning=%v tools=%d mcp_tools=%d",
-		g.prompt,
-		contextCount,
-		len(inputItems),
-		g.cfg.Model,
-		g.cfg.Temperature,
-		g.cfg.MaxTokens,
-		g.cfg.ReasoningLevel,
-		len(g.cfg.Tools),
-		len(g.cfg.MCPTools),
-	)
 
 	response, totals, err := g.client.runResponsesFlow(
 		ctx,
@@ -272,7 +273,9 @@ func (g *textGenerator) Generate(ctx context.Context) (string, model.GenerationM
 	}
 	applyOpenAIResponseMetadata(meta, response, totals)
 
-	return response.OutputText(), meta, nil
+	text := response.OutputText()
+	g.LastOutput = text
+	return text, meta, nil
 }
 
 func (g *structuredGenerator[T]) inputItemsWithContext(ctx context.Context) (responses.ResponseInputParam, int, error) {
@@ -386,7 +389,6 @@ func (c *client) runResponsesFlow(
 		}
 		totals.ToolRounds = round + 1
 
-		log.Infof("tool_round=%d function_calls=%d history_items=%d", round+1, len(calls), len(history))
 		outputItems := make([]responses.ResponseInputItemUnionParam, 0, len(calls))
 
 		for _, call := range calls {

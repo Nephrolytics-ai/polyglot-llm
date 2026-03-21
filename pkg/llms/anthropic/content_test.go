@@ -60,6 +60,26 @@ func (s *ContentSuite) TestMessagesWithContextProviderError() {
 	s.Contains(err.Error(), "provider failed")
 }
 
+func (s *ContentSuite) TestLastOutputReaderStructured() {
+	g := &structuredGeneratorView[map[string]any]{
+		structuredGenerator: &structuredGenerator[map[string]any]{
+			LastOutput: "{\"ok\":true}",
+		},
+	}
+
+	s.Equal("{\"ok\":true}", g.LastOutput())
+}
+
+func (s *ContentSuite) TestLastOutputReaderText() {
+	g := &textGeneratorView{
+		textGenerator: &textGenerator{
+			LastOutput: "raw-text",
+		},
+	}
+
+	s.Equal("raw-text", g.LastOutput())
+}
+
 type stubPromptContextProvider struct {
 	err error
 }

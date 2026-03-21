@@ -50,11 +50,6 @@ func (g *audioTranscriptionGenerator) Generate(ctx context.Context) (string, mod
 	meta := initMetadata(providerName, resolveAudioTranscriptionModelName(g.opts))
 	defer setLatencyMetadata(meta, start)
 
-	logging.NewLogger(ctx).Infof(
-		"audio_transcription_request model=%q",
-		resolveAudioTranscriptionModelName(g.opts),
-	)
-
 	transcript, response, err := g.client.runAudioTranscription(ctx, g.filePath, g.opts)
 	if err != nil {
 		logging.NewLogger(ctx).Errorf("error: %v", err)
