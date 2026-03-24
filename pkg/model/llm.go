@@ -39,6 +39,7 @@ type ContentGenerator[T any] interface {
 	Generate(ctx context.Context) (T, GenerationMetadata, error)
 	AddPromptContext(ctx context.Context, messageType ContextMessageType, content string)
 	AddPromptContextProvider(ctx context.Context, provider PromptContextProvider)
+	LastOutput() string
 }
 
 type EmbeddingGenerator interface {

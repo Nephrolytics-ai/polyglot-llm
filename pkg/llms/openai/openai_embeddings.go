@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Nephrolytics-ai/polyglot-llm/pkg/logging"
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/model"
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/utils"
 	openai "github.com/openai/openai-go/v3"
@@ -56,13 +55,6 @@ func (g *embeddingGenerator) GenerateBatch(
 	start := time.Now()
 	meta := initMetadata(providerName, resolveEmbeddingModelName(g.cfg))
 	defer setLatencyMetadata(meta, start)
-
-	logging.NewLogger(ctx).Infof(
-		"embedding_request inputs=%d model=%q dimensions=%v",
-		len(inputs),
-		resolveEmbeddingModelName(g.cfg),
-		g.cfg.EmbeddingDimensions,
-	)
 
 	vectors, response, err := g.client.runEmbeddings(ctx, inputs, g.cfg)
 	if err != nil {

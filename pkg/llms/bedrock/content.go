@@ -21,6 +21,7 @@ import (
 
 type structuredGenerator[T any] struct {
 	prompt                 string
+	LastOutput             string
 	cfg                    model.GeneratorConfig
 	promptContextMu        sync.RWMutex
 	promptContexts         []*model.PromptContext
@@ -29,10 +30,27 @@ type structuredGenerator[T any] struct {
 
 type textGenerator struct {
 	prompt                 string
+	LastOutput             string
 	cfg                    model.GeneratorConfig
 	promptContextMu        sync.RWMutex
 	promptContexts         []*model.PromptContext
 	promptContextProviders []model.PromptContextProvider
+}
+
+type structuredGeneratorView[T any] struct {
+	*structuredGenerator[T]
+}
+
+func (g *structuredGeneratorView[T]) LastOutput() string {
+	return g.structuredGenerator.LastOutput
+}
+
+type textGeneratorView struct {
+	*textGenerator
+}
+
+func (g *textGeneratorView) LastOutput() string {
+	return g.textGenerator.LastOutput
 }
 
 func NewStructureContentGenerator[T any](prompt string, opts ...model.GeneratorOption) (model.ContentGenerator[T], error) {
@@ -41,9 +59,11 @@ func NewStructureContentGenerator[T any](prompt string, opts ...model.GeneratorO
 	}
 
 	cfg := model.ResolveGeneratorOpts(opts...)
-	return &structuredGenerator[T]{
-		prompt: prompt,
-		cfg:    cfg,
+	return &structuredGeneratorView[T]{
+		structuredGenerator: &structuredGenerator[T]{
+			prompt: prompt,
+			cfg:    cfg,
+		},
 	}, nil
 }
 
@@ -53,9 +73,11 @@ func NewStringContentGenerator(prompt string, opts ...model.GeneratorOption) (mo
 	}
 
 	cfg := model.ResolveGeneratorOpts(opts...)
-	return &textGenerator{
-		prompt: prompt,
-		cfg:    cfg,
+	return &textGeneratorView{
+		textGenerator: &textGenerator{
+			prompt: prompt,
+			cfg:    cfg,
+		},
 	}, nil
 }
 
@@ -116,9 +138,10 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, model.Generat
 	modelName := resolveModelName(g.cfg)
 	meta := initMetadata(modelName)
 	defer setLatencyMetadata(meta, start)
+	g.LastOutput = ""
 
 	log := logging.NewLogger(ctx)
-	system, messages, contextCount, err := g.messagesWithContext(ctx)
+	system, messages, _, err := g.messagesWithContext(ctx)
 	if err != nil {
 		log.Errorf("error: %v", err)
 		var zero T
@@ -167,17 +190,6 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, model.Generat
 		return zero, meta, utils.WrapIfNotNil(err)
 	}
 
-	log.Infof(
-		"prompt=%q context_count=%d model=%q temperature=%v max_tokens=%v tools=%d mcp_tools=%d",
-		g.prompt,
-		contextCount,
-		modelName,
-		g.cfg.Temperature,
-		g.cfg.MaxTokens,
-		len(g.cfg.Tools),
-		len(g.cfg.MCPTools),
-	)
-
 	inference := buildInferenceConfig(g.cfg)
 	finalMessage, totals, stopReason, responseLatencyMs, err := runConverseFlow(
 		ctx,
@@ -205,6 +217,7 @@ func (g *structuredGenerator[T]) Generate(ctx context.Context) (T, model.Generat
 	}
 
 	payload := extractJSONPayload(text)
+	g.LastOutput = payload
 	var out T
 	err = json.Unmarshal([]byte(payload), &out)
 	if err != nil {
@@ -220,9 +233,10 @@ func (g *textGenerator) Generate(ctx context.Context) (string, model.GenerationM
 	modelName := resolveModelName(g.cfg)
 	meta := initMetadata(modelName)
 	defer setLatencyMetadata(meta, start)
+	g.LastOutput = ""
 
 	log := logging.NewLogger(ctx)
-	system, messages, contextCount, err := g.messagesWithContext(ctx)
+	system, messages, _, err := g.messagesWithContext(ctx)
 	if err != nil {
 		log.Errorf("error: %v", err)
 		return "", meta, utils.WrapIfNotNil(err)
@@ -247,17 +261,6 @@ func (g *textGenerator) Generate(ctx context.Context) (string, model.GenerationM
 		return "", meta, utils.WrapIfNotNil(err)
 	}
 
-	log.Infof(
-		"prompt=%q context_count=%d model=%q temperature=%v max_tokens=%v tools=%d mcp_tools=%d",
-		g.prompt,
-		contextCount,
-		modelName,
-		g.cfg.Temperature,
-		g.cfg.MaxTokens,
-		len(g.cfg.Tools),
-		len(g.cfg.MCPTools),
-	)
-
 	inference := buildInferenceConfig(g.cfg)
 	finalMessage, totals, stopReason, responseLatencyMs, err := runConverseFlow(
 		ctx,
@@ -281,6 +284,7 @@ func (g *textGenerator) Generate(ctx context.Context) (string, model.GenerationM
 		log.Errorf("error: %v", err)
 		return "", meta, utils.WrapIfNotNil(err)
 	}
+	g.LastOutput = text
 	return text, meta, nil
 }
 
