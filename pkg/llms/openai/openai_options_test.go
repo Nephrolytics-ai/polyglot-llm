@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	"github.com/Nephrolytics-ai/polyglot-llm/pkg/model"
+	openai "github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/responses"
+	"github.com/openai/openai-go/v3/shared"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -76,6 +78,59 @@ func (s *GeneratorOptionValidationSuite) TestReasoningOnNonReasoningModelIsIgnor
 
 	s.Require().NoError(err)
 	s.Assert().Nil(normalized.ReasoningLevel)
+}
+
+func (s *GeneratorOptionValidationSuite) TestWithServiceTierStoresProviderOption() {
+	cfg := model.ResolveGeneratorOpts(
+		WithServiceTier(ServiceTierFlex),
+	)
+
+	s.Require().NotNil(cfg.ProviderOptions)
+	s.Equal(ServiceTierFlex, cfg.ProviderOptions[serviceTierProviderOptionKey])
+}
+
+func (s *GeneratorOptionValidationSuite) TestResolveServiceTierMapsStandard() {
+	tier, err := resolveServiceTier(model.ResolveGeneratorOpts(WithServiceTier(ServiceTierStandard)))
+
+	s.Require().NoError(err)
+	s.Require().NotNil(tier)
+	s.Equal(responses.ResponseNewParamsServiceTierDefault, *tier)
+}
+
+func (s *GeneratorOptionValidationSuite) TestResolveServiceTierMapsAuto() {
+	tier, err := resolveServiceTier(model.ResolveGeneratorOpts(WithServiceTier(ServiceTierAuto)))
+
+	s.Require().NoError(err)
+	s.Require().NotNil(tier)
+	s.Equal(responses.ResponseNewParamsServiceTierAuto, *tier)
+}
+
+func (s *GeneratorOptionValidationSuite) TestResolveServiceTierMapsFlex() {
+	tier, err := resolveServiceTier(model.ResolveGeneratorOpts(WithServiceTier(ServiceTierFlex)))
+
+	s.Require().NoError(err)
+	s.Require().NotNil(tier)
+	s.Equal(responses.ResponseNewParamsServiceTierFlex, *tier)
+}
+
+func (s *GeneratorOptionValidationSuite) TestResolveServiceTierReturnsNilWhenUnset() {
+	tier, err := resolveServiceTier(model.ResolveGeneratorOpts())
+
+	s.Require().NoError(err)
+	s.Nil(tier)
+}
+
+func (s *GeneratorOptionValidationSuite) TestResolveServiceTierReturnsErrorForInvalidValue() {
+	cfg := model.ResolveGeneratorOpts()
+	cfg.ProviderOptions = map[string]any{
+		serviceTierProviderOptionKey: ServiceTier("bad-tier"),
+	}
+
+	tier, err := resolveServiceTier(cfg)
+
+	s.Require().Error(err)
+	s.Nil(tier)
+	s.Contains(err.Error(), "unsupported openai service tier")
 }
 
 func (s *GeneratorOptionValidationSuite) TestBuildInputItemsWithContextIncludesPromptContexts() {
@@ -178,6 +233,69 @@ func (s *GeneratorOptionValidationSuite) TestMCPHeadersWithAuthTokenPreservesAut
 	s.Require().NotNil(headers)
 	s.Equal("Bearer existing", headers["Authorization"])
 	s.Equal("abc", headers["X-Custom"])
+}
+
+func (s *GeneratorOptionValidationSuite) TestBuildInitialParamsSetsServiceTierWhenConfigured() {
+	c := &client{}
+	cfg := model.ResolveGeneratorOpts(
+		model.WithModel("gpt-5-mini"),
+		WithServiceTier(ServiceTierFlex),
+	)
+
+	params, handlers, err := c.buildInitialParams(
+		context.Background(),
+		responses.ResponseNewParamsInputUnion{
+			OfInputItemList: responses.ResponseInputParam{
+				responses.ResponseInputItemParamOfMessage("hello", responses.EasyInputMessageRoleUser),
+			},
+		},
+		cfg,
+		nil,
+	)
+
+	s.Require().NoError(err)
+	s.Empty(handlers)
+	s.Equal(responses.ResponseNewParamsServiceTierFlex, params.ServiceTier)
+}
+
+func (s *GeneratorOptionValidationSuite) TestBuildInitialParamsLeavesServiceTierUnsetByDefault() {
+	c := &client{}
+	cfg := model.ResolveGeneratorOpts(
+		model.WithModel("gpt-5-mini"),
+	)
+
+	params, _, err := c.buildInitialParams(
+		context.Background(),
+		responses.ResponseNewParamsInputUnion{
+			OfInputItemList: responses.ResponseInputParam{
+				responses.ResponseInputItemParamOfMessage("hello", responses.EasyInputMessageRoleUser),
+			},
+		},
+		cfg,
+		nil,
+	)
+
+	s.Require().NoError(err)
+	s.Equal(responses.ResponseNewParamsServiceTier(""), params.ServiceTier)
+}
+
+func (s *GeneratorOptionValidationSuite) TestBuildStatelessFollowupParamsPreservesServiceTier() {
+	initial := responses.ResponseNewParams{
+		Model:           shared.ResponsesModel("gpt-5-mini"),
+		Temperature:     openai.Float(0.2),
+		MaxOutputTokens: openai.Int(128),
+		ServiceTier:     responses.ResponseNewParamsServiceTierAuto,
+	}
+
+	followup := buildStatelessFollowupParams(
+		initial,
+		responses.ResponseInputParam{
+			responses.ResponseInputItemParamOfMessage("hello", responses.EasyInputMessageRoleUser),
+		},
+		nil,
+	)
+
+	s.Equal(responses.ResponseNewParamsServiceTierAuto, followup.ServiceTier)
 }
 
 type stubPromptContextProvider struct {

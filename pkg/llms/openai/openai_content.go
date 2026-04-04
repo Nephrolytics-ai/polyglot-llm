@@ -483,6 +483,13 @@ func (c *client) buildInitialParams(
 			Effort: mapReasoningLevel(*cfg.ReasoningLevel),
 		}
 	}
+	serviceTier, err := resolveServiceTier(cfg)
+	if err != nil {
+		return responses.ResponseNewParams{}, nil, utils.WrapIfNotNil(err)
+	}
+	if serviceTier != nil {
+		params.ServiceTier = *serviceTier
+	}
 	if textCfg != nil {
 		params.Text = *textCfg
 	}
@@ -615,6 +622,7 @@ func buildStatelessFollowupParams(
 		Temperature:     initial.Temperature,
 		MaxOutputTokens: initial.MaxOutputTokens,
 		Reasoning:       initial.Reasoning,
+		ServiceTier:     initial.ServiceTier,
 		Tools:           initial.Tools,
 		Include:         append([]responses.ResponseIncludable(nil), initial.Include...),
 		Input: responses.ResponseNewParamsInputUnion{
