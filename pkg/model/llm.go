@@ -114,6 +114,7 @@ type GeneratorOpts = GeneratorOption
 //   - ReasoningLevel: optional reasoning effort level for models that support it.
 //   - Tools: optional local function/tool declarations and handlers.
 //   - MCPTools: optional remote MCP tool servers to expose during generation.
+//   - ProviderOptions: provider-local opaque options keyed by provider-specific names.
 type GeneratorConfig struct {
 	IgnoreInvalidGeneratorOptions bool
 	URL                           string
@@ -125,6 +126,7 @@ type GeneratorConfig struct {
 	ReasoningLevel                *ReasoningLevel
 	Tools                         []Tool
 	MCPTools                      []MCPTool
+	ProviderOptions               map[string]any
 }
 
 type ReasoningLevel string
@@ -229,6 +231,16 @@ func WithMCPTools(tools []MCPTool) GeneratorOption {
 func WithReasoningLevel(level ReasoningLevel) GeneratorOption {
 	return generatorOptionFunc(func(cfg *GeneratorConfig) {
 		cfg.ReasoningLevel = &level
+	})
+}
+
+// WithProviderOption stores a provider-specific option without expanding the shared model option surface.
+func WithProviderOption(key string, value any) GeneratorOption {
+	return generatorOptionFunc(func(cfg *GeneratorConfig) {
+		if cfg.ProviderOptions == nil {
+			cfg.ProviderOptions = map[string]any{}
+		}
+		cfg.ProviderOptions[key] = value
 	})
 }
 
