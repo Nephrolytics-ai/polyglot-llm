@@ -2,6 +2,7 @@ package huggingface
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -122,6 +123,57 @@ func (s *ContentSuite) TestLastOutputReaderText() {
 	}
 
 	s.Equal("raw-text", g.LastOutput())
+}
+
+func (s *ContentSuite) TestToolResultMessageMarshalsWithName() {
+	msg := chatMessage{
+		Role:       "tool",
+		Name:       "get_secret_value",
+		ToolCallID: "call_123",
+		Content:    `{"secret":"value"}`,
+	}
+
+	body, err := json.Marshal(msg)
+
+	s.Require().NoError(err)
+	s.Contains(string(body), `"role":"tool"`)
+	s.Contains(string(body), `"name":"get_secret_value"`)
+	s.Contains(string(body), `"tool_call_id":"call_123"`)
+	s.Contains(string(body), `"content":"{\"secret\":\"value\"}"`)
+}
+
+func (s *ContentSuite) TestChatCompletionRequestMarshalsToolChoiceAutoWhenSet() {
+	req := chatCompletionRequest{
+		Model:      "openai/gpt-oss-120b:cerebras",
+		Messages:   []chatMessage{{Role: "user", Content: "hello"}},
+		ToolChoice: "auto",
+		Tools: []chatTool{
+			{
+				Type: "function",
+				Function: chatFunction{
+					Name:       "get_secret_value",
+					Parameters: map[string]any{"type": "object"},
+				},
+			},
+		},
+	}
+
+	body, err := json.Marshal(req)
+
+	s.Require().NoError(err)
+	s.Contains(string(body), `"tool_choice":"auto"`)
+}
+
+func (s *ContentSuite) TestChatCompletionRequestOmitsToolChoiceWhenUnset() {
+	req := chatCompletionRequest{
+		Model:    "openai/gpt-oss-120b:cerebras",
+		Messages: []chatMessage{{Role: "user", Content: "hello"}},
+	}
+
+	body, err := json.Marshal(req)
+
+	s.Require().NoError(err)
+	s.NotContains(string(body), `"tool_choice"`)
 }
 
 type stubPromptContextProvider struct {

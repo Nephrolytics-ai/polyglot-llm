@@ -48,6 +48,7 @@ type flowUsageTotals struct {
 type chatMessage struct {
 	Role       string         `json:"role"`
 	Content    string         `json:"content,omitempty"`
+	Name       string         `json:"name,omitempty"`
 	ToolCalls  []chatToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string         `json:"tool_call_id,omitempty"`
 }
@@ -79,6 +80,7 @@ type chatCompletionRequest struct {
 	Messages    []chatMessage `json:"messages"`
 	MaxTokens   int           `json:"max_tokens,omitempty"`
 	Temperature *float64      `json:"temperature,omitempty"`
+	ToolChoice  string        `json:"tool_choice,omitempty"`
 	Tools       []chatTool    `json:"tools,omitempty"`
 }
 
