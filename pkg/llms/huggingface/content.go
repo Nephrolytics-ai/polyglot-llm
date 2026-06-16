@@ -271,6 +271,7 @@ func runMessageFlow(
 			request.Temperature = cfg.Temperature
 		}
 		if len(tools) > 0 {
+			request.ToolChoice = "auto"
 			request.Tools = append([]chatTool(nil), tools...)
 		}
 
@@ -316,6 +317,7 @@ func runMessageFlow(
 
 			messages = append(messages, chatMessage{
 				Role:       "tool",
+				Name:       toolCall.Function.Name,
 				Content:    string(resultJSON),
 				ToolCallID: toolCall.ID,
 			})

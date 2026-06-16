@@ -20,6 +20,7 @@ type HuggingFaceIntegrationSuite struct {
 	ExternalDependenciesSuite
 	apiKey         string
 	model          string
+	toolModel      string
 	embeddingModel string
 }
 
@@ -42,6 +43,10 @@ func (s *HuggingFaceIntegrationSuite) SetupSuite() {
 	s.model = strings.TrimSpace(os.Getenv("HF_MODEL"))
 	if s.model == "" {
 		s.model = "Qwen/Qwen2.5-72B-Instruct"
+	}
+	s.toolModel = s.model
+	if strings.TrimSpace(os.Getenv("HF_MODEL")) == "" {
+		s.toolModel = "openai/gpt-oss-120b:cerebras"
 	}
 	s.embeddingModel = strings.TrimSpace(os.Getenv("HF_EMBEDDING_MODEL"))
 	if s.embeddingModel == "" {
@@ -128,7 +133,12 @@ func (s *HuggingFaceIntegrationSuite) TestCreateGeneratorAndGenerateWithTool() {
 		},
 	}
 
-	opts := append([]model.GeneratorOption{}, s.generationOpts()...)
+	options := []model.GeneratorOption{
+		model.WithAuthToken(s.apiKey),
+		model.WithModel(s.toolModel),
+		model.WithMaxTokens(4096),
+	}
+	opts := append([]model.GeneratorOption{}, options...)
 	opts = append(opts, model.WithTools(tools))
 
 	generator, err := huggingface.NewStructureContentGenerator[huggingFaceToolStructuredResponse](
