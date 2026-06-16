@@ -12,6 +12,9 @@ import (
 //   - openai.prompt_cache_key
 const promptCacheKeyProviderOptionKey = "openai.prompt_cache_key"
 
+func WithPromptCacheKey(value string) model.GeneratorOption {
+	return model.WithProviderOption(promptCacheKeyProviderOptionKey, value)
+}
 func resolvePromptCacheKey(cfg model.GeneratorConfig) (*string, error) {
 	if len(cfg.ProviderOptions) == 0 {
 		return nil, nil
