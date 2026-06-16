@@ -17,6 +17,7 @@ import (
 	"github.com/invopop/jsonschema"
 	openai "github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
+	"github.com/openai/openai-go/v3/packages/param"
 	"github.com/openai/openai-go/v3/responses"
 	"github.com/openai/openai-go/v3/shared"
 )
@@ -490,6 +491,13 @@ func (c *client) buildInitialParams(
 	if serviceTier != nil {
 		params.ServiceTier = *serviceTier
 	}
+	promptCacheKey, err := resolvePromptCacheKey(cfg)
+	if err != nil {
+		return responses.ResponseNewParams{}, nil, utils.WrapIfNotNil(err)
+	}
+	if promptCacheKey != nil {
+		params.PromptCacheKey = param.NewOpt(*promptCacheKey)
+	}
 	if textCfg != nil {
 		params.Text = *textCfg
 	}
@@ -623,6 +631,7 @@ func buildStatelessFollowupParams(
 		MaxOutputTokens: initial.MaxOutputTokens,
 		Reasoning:       initial.Reasoning,
 		ServiceTier:     initial.ServiceTier,
+		PromptCacheKey:  initial.PromptCacheKey,
 		Tools:           initial.Tools,
 		Include:         append([]responses.ResponseIncludable(nil), initial.Include...),
 		Input: responses.ResponseNewParamsInputUnion{

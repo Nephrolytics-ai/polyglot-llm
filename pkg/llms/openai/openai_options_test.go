@@ -133,6 +133,42 @@ func (s *GeneratorOptionValidationSuite) TestResolveServiceTierReturnsErrorForIn
 	s.Contains(err.Error(), "unsupported openai service tier")
 }
 
+func (s *GeneratorOptionValidationSuite) TestResolvePromptCacheKeyReturnsValueWhenConfigured() {
+	key, err := resolvePromptCacheKey(model.ResolveGeneratorOpts(
+		model.WithProviderOption(promptCacheKeyProviderOptionKey, "patient-123"),
+	))
+
+	s.Require().NoError(err)
+	s.Require().NotNil(key)
+	s.Equal("patient-123", *key)
+}
+
+func (s *GeneratorOptionValidationSuite) TestResolvePromptCacheKeyReturnsNilWhenUnset() {
+	key, err := resolvePromptCacheKey(model.ResolveGeneratorOpts())
+
+	s.Require().NoError(err)
+	s.Nil(key)
+}
+
+func (s *GeneratorOptionValidationSuite) TestResolvePromptCacheKeyReturnsNilForBlankValue() {
+	key, err := resolvePromptCacheKey(model.ResolveGeneratorOpts(
+		model.WithProviderOption(promptCacheKeyProviderOptionKey, "   "),
+	))
+
+	s.Require().NoError(err)
+	s.Nil(key)
+}
+
+func (s *GeneratorOptionValidationSuite) TestResolvePromptCacheKeyReturnsErrorForInvalidType() {
+	key, err := resolvePromptCacheKey(model.ResolveGeneratorOpts(
+		model.WithProviderOption(promptCacheKeyProviderOptionKey, 123),
+	))
+
+	s.Require().Error(err)
+	s.Nil(key)
+	s.Contains(err.Error(), "invalid openai prompt cache key option type")
+}
+
 func (s *GeneratorOptionValidationSuite) TestBuildInputItemsWithContextIncludesPromptContexts() {
 	items, contextCount, err := buildInputItemsWithContext("final prompt", []*model.PromptContext{
 		{
@@ -279,6 +315,76 @@ func (s *GeneratorOptionValidationSuite) TestBuildInitialParamsLeavesServiceTier
 	s.Equal(responses.ResponseNewParamsServiceTier(""), params.ServiceTier)
 }
 
+func (s *GeneratorOptionValidationSuite) TestBuildInitialParamsSetsPromptCacheKeyWhenConfigured() {
+	c := &client{}
+	cfg := model.ResolveGeneratorOpts(
+		model.WithModel("gpt-5-mini"),
+		model.WithProviderOption(promptCacheKeyProviderOptionKey, "encounter-42"),
+	)
+
+	params, handlers, err := c.buildInitialParams(
+		context.Background(),
+		responses.ResponseNewParamsInputUnion{
+			OfInputItemList: responses.ResponseInputParam{
+				responses.ResponseInputItemParamOfMessage("hello", responses.EasyInputMessageRoleUser),
+			},
+		},
+		cfg,
+		nil,
+	)
+
+	s.Require().NoError(err)
+	s.Empty(handlers)
+	s.True(params.PromptCacheKey.Valid())
+	s.Equal("encounter-42", params.PromptCacheKey.Value)
+}
+
+func (s *GeneratorOptionValidationSuite) TestBuildInitialParamsLeavesPromptCacheKeyUnsetByDefault() {
+	c := &client{}
+	cfg := model.ResolveGeneratorOpts(
+		model.WithModel("gpt-5-mini"),
+	)
+
+	params, _, err := c.buildInitialParams(
+		context.Background(),
+		responses.ResponseNewParamsInputUnion{
+			OfInputItemList: responses.ResponseInputParam{
+				responses.ResponseInputItemParamOfMessage("hello", responses.EasyInputMessageRoleUser),
+			},
+		},
+		cfg,
+		nil,
+	)
+
+	s.Require().NoError(err)
+	s.False(params.PromptCacheKey.Valid())
+}
+
+func (s *GeneratorOptionValidationSuite) TestBuildInitialParamsAllowsPromptCacheKeyAndServiceTierTogether() {
+	c := &client{}
+	cfg := model.ResolveGeneratorOpts(
+		model.WithModel("gpt-5-mini"),
+		model.WithProviderOption(promptCacheKeyProviderOptionKey, "encounter-42"),
+		WithServiceTier(ServiceTierAuto),
+	)
+
+	params, _, err := c.buildInitialParams(
+		context.Background(),
+		responses.ResponseNewParamsInputUnion{
+			OfInputItemList: responses.ResponseInputParam{
+				responses.ResponseInputItemParamOfMessage("hello", responses.EasyInputMessageRoleUser),
+			},
+		},
+		cfg,
+		nil,
+	)
+
+	s.Require().NoError(err)
+	s.Equal(responses.ResponseNewParamsServiceTierAuto, params.ServiceTier)
+	s.True(params.PromptCacheKey.Valid())
+	s.Equal("encounter-42", params.PromptCacheKey.Value)
+}
+
 func (s *GeneratorOptionValidationSuite) TestBuildStatelessFollowupParamsPreservesServiceTier() {
 	initial := responses.ResponseNewParams{
 		Model:           shared.ResponsesModel("gpt-5-mini"),
@@ -296,6 +402,24 @@ func (s *GeneratorOptionValidationSuite) TestBuildStatelessFollowupParamsPreserv
 	)
 
 	s.Equal(responses.ResponseNewParamsServiceTierAuto, followup.ServiceTier)
+}
+
+func (s *GeneratorOptionValidationSuite) TestBuildStatelessFollowupParamsPreservesPromptCacheKey() {
+	initial := responses.ResponseNewParams{
+		Model:          shared.ResponsesModel("gpt-5-mini"),
+		PromptCacheKey: openai.String("encounter-42"),
+	}
+
+	followup := buildStatelessFollowupParams(
+		initial,
+		responses.ResponseInputParam{
+			responses.ResponseInputItemParamOfMessage("hello", responses.EasyInputMessageRoleUser),
+		},
+		nil,
+	)
+
+	s.True(followup.PromptCacheKey.Valid())
+	s.Equal("encounter-42", followup.PromptCacheKey.Value)
 }
 
 type stubPromptContextProvider struct {
