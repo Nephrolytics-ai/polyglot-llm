@@ -15,12 +15,14 @@ const (
 	defaultGenerationModelName = "llama3.1"
 	defaultEmbeddingModelName  = "nomic-embed-text"
 	defaultBaseURL             = "http://localhost:11434"
+	envOllamaAuthToken         = "OLLAMA_AUTH_TOKEN"
 	maxToolRounds              = 12
 )
 
 type client struct {
 	apiClient *ollamasdk.OllamaClient
 	baseURL   string
+	authToken string
 }
 
 func newClient(cfg model.GeneratorConfig) *client {
@@ -32,10 +34,34 @@ func newClient(cfg model.GeneratorConfig) *client {
 		baseURL = defaultBaseURL
 	}
 
+	authToken := strings.TrimSpace(cfg.AuthToken)
+	if authToken == "" {
+		authToken = strings.TrimSpace(os.Getenv(envOllamaAuthToken))
+	}
+
 	return &client{
 		apiClient: ollamasdk.NewClient(baseURL),
 		baseURL:   baseURL,
+		authToken: authToken,
 	}
+}
+
+func (c *client) applyAuthHeader(headers interface{ Set(string, string) }) {
+	if c == nil || headers == nil {
+		return
+	}
+
+	token := strings.TrimSpace(c.authToken)
+	if token == "" {
+		return
+	}
+
+	if strings.HasPrefix(strings.ToLower(token), "bearer ") {
+		headers.Set("Authorization", token)
+		return
+	}
+
+	headers.Set("Authorization", "Bearer "+token)
 }
 
 func resolveGenerationModelName(cfg model.GeneratorConfig) string {
