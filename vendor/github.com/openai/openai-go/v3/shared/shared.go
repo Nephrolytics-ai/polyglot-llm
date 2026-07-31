@@ -15,12 +15,42 @@ import (
 type paramUnion = param.APIUnion
 type paramObj = param.APIObject
 
+// AllModels also accepts any [string] or [ChatModel]
+type AllModels = string
+
+const (
+	AllModelsO1Pro                        AllModels = "o1-pro"
+	AllModelsO1Pro2025_03_19              AllModels = "o1-pro-2025-03-19"
+	AllModelsO3Pro                        AllModels = "o3-pro"
+	AllModelsO3Pro2025_06_10              AllModels = "o3-pro-2025-06-10"
+	AllModelsO3DeepResearch               AllModels = "o3-deep-research"
+	AllModelsO3DeepResearch2025_06_26     AllModels = "o3-deep-research-2025-06-26"
+	AllModelsO4MiniDeepResearch           AllModels = "o4-mini-deep-research"
+	AllModelsO4MiniDeepResearch2025_06_26 AllModels = "o4-mini-deep-research-2025-06-26"
+	AllModelsComputerUsePreview           AllModels = "computer-use-preview"
+	AllModelsComputerUsePreview2025_03_11 AllModels = "computer-use-preview-2025-03-11"
+	AllModelsGPT5Codex                    AllModels = "gpt-5-codex"
+	AllModelsGPT5Pro                      AllModels = "gpt-5-pro"
+	AllModelsGPT5Pro2025_10_06            AllModels = "gpt-5-pro-2025-10-06"
+	AllModelsGPT5_1CodexMax               AllModels = "gpt-5.1-codex-max"
+	// Or some ...[ChatModel]
+)
+
 type ChatModel = string
 type ResponsesModel = string
 
 // aliased to make [param.APIObject] private when embedding
 
 const (
+	ChatModelGPT5_6Sol                        ChatModel = "gpt-5.6-sol"
+	ChatModelGPT5_6Terra                      ChatModel = "gpt-5.6-terra"
+	ChatModelGPT5_6Luna                       ChatModel = "gpt-5.6-luna"
+	ChatModelGPT5_4                           ChatModel = "gpt-5.4"
+	ChatModelGPT5_4Mini                       ChatModel = "gpt-5.4-mini"
+	ChatModelGPT5_4Nano                       ChatModel = "gpt-5.4-nano"
+	ChatModelGPT5_4Mini2026_03_17             ChatModel = "gpt-5.4-mini-2026-03-17"
+	ChatModelGPT5_4Nano2026_03_17             ChatModel = "gpt-5.4-nano-2026-03-17"
+	ChatModelGPT5_3ChatLatest                 ChatModel = "gpt-5.3-chat-latest"
 	ChatModelGPT5_2                           ChatModel = "gpt-5.2"
 	ChatModelGPT5_2_2025_12_11                ChatModel = "gpt-5.2-2025-12-11"
 	ChatModelGPT5_2ChatLatest                 ChatModel = "gpt-5.2-chat-latest"
@@ -99,7 +129,7 @@ const (
 // defined comparison operation.
 type ComparisonFilter struct {
 	// The key to compare against the value.
-	Key string `json:"key,required"`
+	Key string `json:"key" api:"required"`
 	// Specifies the comparison operator: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`,
 	// `nin`.
 	//
@@ -112,11 +142,11 @@ type ComparisonFilter struct {
 	// - `in`: in
 	// - `nin`: not in
 	//
-	// Any of "eq", "ne", "gt", "gte", "lt", "lte".
-	Type ComparisonFilterType `json:"type,required"`
+	// Any of "eq", "ne", "gt", "gte", "lt", "lte", "in", "nin".
+	Type ComparisonFilterType `json:"type" api:"required"`
 	// The value to compare against the attribute key; supports string, number, or
 	// boolean types.
-	Value ComparisonFilterValueUnion `json:"value,required"`
+	Value ComparisonFilterValueUnion `json:"value" api:"required"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Key         respjson.Field
@@ -162,6 +192,8 @@ const (
 	ComparisonFilterTypeGte ComparisonFilterType = "gte"
 	ComparisonFilterTypeLt  ComparisonFilterType = "lt"
 	ComparisonFilterTypeLte ComparisonFilterType = "lte"
+	ComparisonFilterTypeIn  ComparisonFilterType = "in"
+	ComparisonFilterTypeNin ComparisonFilterType = "nin"
 )
 
 // ComparisonFilterValueUnion contains all possible properties and values from
@@ -259,7 +291,7 @@ func (r *ComparisonFilterValueArrayItemUnion) UnmarshalJSON(data []byte) error {
 // The properties Key, Type, Value are required.
 type ComparisonFilterParam struct {
 	// The key to compare against the value.
-	Key string `json:"key,required"`
+	Key string `json:"key" api:"required"`
 	// Specifies the comparison operator: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`,
 	// `nin`.
 	//
@@ -272,11 +304,11 @@ type ComparisonFilterParam struct {
 	// - `in`: in
 	// - `nin`: not in
 	//
-	// Any of "eq", "ne", "gt", "gte", "lt", "lte".
-	Type ComparisonFilterType `json:"type,omitzero,required"`
+	// Any of "eq", "ne", "gt", "gte", "lt", "lte", "in", "nin".
+	Type ComparisonFilterType `json:"type,omitzero" api:"required"`
 	// The value to compare against the attribute key; supports string, number, or
 	// boolean types.
-	Value ComparisonFilterValueUnionParam `json:"value,omitzero,required"`
+	Value ComparisonFilterValueUnionParam `json:"value,omitzero" api:"required"`
 	paramObj
 }
 
@@ -348,11 +380,11 @@ func (u *ComparisonFilterValueArrayItemUnionParam) asAny() any {
 type CompoundFilter struct {
 	// Array of filters to combine. Items can be `ComparisonFilter` or
 	// `CompoundFilter`.
-	Filters []ComparisonFilter `json:"filters,required"`
+	Filters []ComparisonFilter `json:"filters" api:"required"`
 	// Type of operation: `and` or `or`.
 	//
 	// Any of "and", "or".
-	Type CompoundFilterType `json:"type,required"`
+	Type CompoundFilterType `json:"type" api:"required"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Filters     respjson.Field
@@ -391,11 +423,11 @@ const (
 type CompoundFilterParam struct {
 	// Array of filters to combine. Items can be `ComparisonFilter` or
 	// `CompoundFilter`.
-	Filters []ComparisonFilterParam `json:"filters,omitzero,required"`
+	Filters []ComparisonFilterParam `json:"filters,omitzero" api:"required"`
 	// Type of operation: `and` or `or`.
 	//
 	// Any of "and", "or".
-	Type CompoundFilterType `json:"type,omitzero,required"`
+	Type CompoundFilterType `json:"type,omitzero" api:"required"`
 	paramObj
 }
 
@@ -483,7 +515,7 @@ func (r CustomToolInputFormatUnion) ToParam() CustomToolInputFormatUnionParam {
 // Unconstrained free-form text.
 type CustomToolInputFormatText struct {
 	// Unconstrained text format. Always `text`.
-	Type constant.Text `json:"type,required"`
+	Type constant.Text `json:"type" default:"text"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Type        respjson.Field
@@ -503,13 +535,13 @@ func (CustomToolInputFormatText) implCustomToolInputFormatUnion() {}
 // A grammar defined by the user.
 type CustomToolInputFormatGrammar struct {
 	// The grammar definition.
-	Definition string `json:"definition,required"`
+	Definition string `json:"definition" api:"required"`
 	// The syntax of the grammar definition. One of `lark` or `regex`.
 	//
 	// Any of "lark", "regex".
-	Syntax string `json:"syntax,required"`
+	Syntax string `json:"syntax" api:"required"`
 	// Grammar format. Always `grammar`.
-	Type constant.Grammar `json:"type,required"`
+	Type constant.Grammar `json:"type" default:"grammar"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Definition  respjson.Field
@@ -606,7 +638,7 @@ func NewCustomToolInputFormatTextParam() CustomToolInputFormatTextParam {
 // [NewCustomToolInputFormatTextParam].
 type CustomToolInputFormatTextParam struct {
 	// Unconstrained text format. Always `text`.
-	Type constant.Text `json:"type,required"`
+	Type constant.Text `json:"type" default:"text"`
 	paramObj
 }
 
@@ -623,15 +655,15 @@ func (r *CustomToolInputFormatTextParam) UnmarshalJSON(data []byte) error {
 // The properties Definition, Syntax, Type are required.
 type CustomToolInputFormatGrammarParam struct {
 	// The grammar definition.
-	Definition string `json:"definition,required"`
+	Definition string `json:"definition" api:"required"`
 	// The syntax of the grammar definition. One of `lark` or `regex`.
 	//
 	// Any of "lark", "regex".
-	Syntax string `json:"syntax,omitzero,required"`
+	Syntax string `json:"syntax,omitzero" api:"required"`
 	// Grammar format. Always `grammar`.
 	//
 	// This field can be elided, and will marshal its zero value as "grammar".
-	Type constant.Grammar `json:"type,required"`
+	Type constant.Grammar `json:"type" default:"grammar"`
 	paramObj
 }
 
@@ -650,10 +682,10 @@ func init() {
 }
 
 type ErrorObject struct {
-	Code    string `json:"code,required"`
-	Message string `json:"message,required"`
-	Param   string `json:"param,required"`
-	Type    string `json:"type,required"`
+	Code    string `json:"code" api:"required"`
+	Message string `json:"message" api:"required"`
+	Param   string `json:"param" api:"required"`
+	Type    string `json:"type" api:"required"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Code        respjson.Field
@@ -674,7 +706,7 @@ func (r *ErrorObject) UnmarshalJSON(data []byte) error {
 type FunctionDefinition struct {
 	// The name of the function to be called. Must be a-z, A-Z, 0-9, or contain
 	// underscores and dashes, with a maximum length of 64.
-	Name string `json:"name,required"`
+	Name string `json:"name" api:"required"`
 	// A description of what the function does, used by the model to choose when and
 	// how to call the function.
 	Description string `json:"description"`
@@ -691,7 +723,7 @@ type FunctionDefinition struct {
 	// field. Only a subset of JSON Schema is supported when `strict` is `true`. Learn
 	// more about Structured Outputs in the
 	// [function calling guide](https://platform.openai.com/docs/guides/function-calling).
-	Strict bool `json:"strict,nullable"`
+	Strict bool `json:"strict" api:"nullable"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Name        respjson.Field
@@ -722,7 +754,7 @@ func (r FunctionDefinition) ToParam() FunctionDefinitionParam {
 type FunctionDefinitionParam struct {
 	// The name of the function to be called. Must be a-z, A-Z, 0-9, or contain
 	// underscores and dashes, with a maximum length of 64.
-	Name string `json:"name,required"`
+	Name string `json:"name" api:"required"`
 	// Whether to enable strict schema adherence when generating the function call. If
 	// set to true, the model will follow the exact schema defined in the `parameters`
 	// field. Only a subset of JSON Schema is supported when `strict` is `true`. Learn
@@ -755,27 +787,36 @@ type FunctionParameters map[string]any
 
 type Metadata map[string]string
 
+type OAuthErrorCode string
+
+const (
+	OAuthErrorCodeInvalidGrant        OAuthErrorCode = "invalid_grant"
+	OAuthErrorCodeInvalidSubjectToken OAuthErrorCode = "invalid_subject_token"
+)
+
 // **gpt-5 and o-series models only**
 //
 // Configuration options for
 // [reasoning models](https://platform.openai.com/docs/guides/reasoning).
 type Reasoning struct {
-	// Constrains effort on reasoning for
-	// [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-	// supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
-	// Reducing reasoning effort can result in faster responses and fewer tokens used
-	// on reasoning in a response.
+	// Controls which reasoning items are rendered back to the model on later turns. If
+	// omitted or set to `auto`, the model determines the context mode. The `gpt-5.6`
+	// model family defaults to `all_turns`; earlier models default to `current_turn`.
 	//
-	//   - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
-	//     reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
-	//     calls are supported for all reasoning values in gpt-5.1.
-	//   - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
-	//     support `none`.
-	//   - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-	//   - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+	// When returned on a response, this is the effective reasoning context mode used
+	// for the response.
 	//
-	// Any of "none", "minimal", "low", "medium", "high", "xhigh".
-	Effort ReasoningEffort `json:"effort,nullable"`
+	// Any of "auto", "current_turn", "all_turns".
+	Context ReasoningContext `json:"context" api:"nullable"`
+	// Constrains effort on reasoning for reasoning models. Currently supported values
+	// are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+	// reasoning effort can result in faster responses and fewer tokens used on
+	// reasoning in a response. Not all reasoning models support every value. See the
+	// [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+	// model-specific support.
+	//
+	// Any of "none", "minimal", "low", "medium", "high", "xhigh", "max".
+	Effort ReasoningEffort `json:"effort" api:"nullable"`
 	// **Deprecated:** use `summary` instead.
 	//
 	// A summary of the reasoning performed by the model. This can be useful for
@@ -785,7 +826,11 @@ type Reasoning struct {
 	// Any of "auto", "concise", "detailed".
 	//
 	// Deprecated: deprecated
-	GenerateSummary ReasoningGenerateSummary `json:"generate_summary,nullable"`
+	GenerateSummary ReasoningGenerateSummary `json:"generate_summary" api:"nullable"`
+	// Controls the reasoning execution mode for the request.
+	//
+	// When returned on a response, this is the effective execution mode.
+	Mode ReasoningMode `json:"mode"`
 	// A summary of the reasoning performed by the model. This can be useful for
 	// debugging and understanding the model's reasoning process. One of `auto`,
 	// `concise`, or `detailed`.
@@ -794,11 +839,13 @@ type Reasoning struct {
 	// models after `gpt-5`.
 	//
 	// Any of "auto", "concise", "detailed".
-	Summary ReasoningSummary `json:"summary,nullable"`
+	Summary ReasoningSummary `json:"summary" api:"nullable"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
+		Context         respjson.Field
 		Effort          respjson.Field
 		GenerateSummary respjson.Field
+		Mode            respjson.Field
 		Summary         respjson.Field
 		ExtraFields     map[string]respjson.Field
 		raw             string
@@ -820,6 +867,20 @@ func (r Reasoning) ToParam() ReasoningParam {
 	return param.Override[ReasoningParam](json.RawMessage(r.RawJSON()))
 }
 
+// Controls which reasoning items are rendered back to the model on later turns. If
+// omitted or set to `auto`, the model determines the context mode. The `gpt-5.6`
+// model family defaults to `all_turns`; earlier models default to `current_turn`.
+//
+// When returned on a response, this is the effective reasoning context mode used
+// for the response.
+type ReasoningContext string
+
+const (
+	ReasoningContextAuto        ReasoningContext = "auto"
+	ReasoningContextCurrentTurn ReasoningContext = "current_turn"
+	ReasoningContextAllTurns    ReasoningContext = "all_turns"
+)
+
 // **Deprecated:** use `summary` instead.
 //
 // A summary of the reasoning performed by the model. This can be useful for
@@ -831,6 +892,16 @@ const (
 	ReasoningGenerateSummaryAuto     ReasoningGenerateSummary = "auto"
 	ReasoningGenerateSummaryConcise  ReasoningGenerateSummary = "concise"
 	ReasoningGenerateSummaryDetailed ReasoningGenerateSummary = "detailed"
+)
+
+// Controls the reasoning execution mode for the request.
+//
+// When returned on a response, this is the effective execution mode.
+type ReasoningMode string
+
+const (
+	ReasoningModeStandard ReasoningMode = "standard"
+	ReasoningModePro      ReasoningMode = "pro"
 )
 
 // A summary of the reasoning performed by the model. This can be useful for
@@ -852,21 +923,23 @@ const (
 // Configuration options for
 // [reasoning models](https://platform.openai.com/docs/guides/reasoning).
 type ReasoningParam struct {
-	// Constrains effort on reasoning for
-	// [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-	// supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
-	// Reducing reasoning effort can result in faster responses and fewer tokens used
-	// on reasoning in a response.
+	// Controls which reasoning items are rendered back to the model on later turns. If
+	// omitted or set to `auto`, the model determines the context mode. The `gpt-5.6`
+	// model family defaults to `all_turns`; earlier models default to `current_turn`.
 	//
-	//   - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
-	//     reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
-	//     calls are supported for all reasoning values in gpt-5.1.
-	//   - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
-	//     support `none`.
-	//   - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-	//   - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+	// When returned on a response, this is the effective reasoning context mode used
+	// for the response.
 	//
-	// Any of "none", "minimal", "low", "medium", "high", "xhigh".
+	// Any of "auto", "current_turn", "all_turns".
+	Context ReasoningContext `json:"context,omitzero"`
+	// Constrains effort on reasoning for reasoning models. Currently supported values
+	// are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+	// reasoning effort can result in faster responses and fewer tokens used on
+	// reasoning in a response. Not all reasoning models support every value. See the
+	// [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+	// model-specific support.
+	//
+	// Any of "none", "minimal", "low", "medium", "high", "xhigh", "max".
 	Effort ReasoningEffort `json:"effort,omitzero"`
 	// **Deprecated:** use `summary` instead.
 	//
@@ -887,6 +960,10 @@ type ReasoningParam struct {
 	//
 	// Any of "auto", "concise", "detailed".
 	Summary ReasoningSummary `json:"summary,omitzero"`
+	// Controls the reasoning execution mode for the request.
+	//
+	// When returned on a response, this is the effective execution mode.
+	Mode ReasoningMode `json:"mode,omitzero"`
 	paramObj
 }
 
@@ -898,19 +975,12 @@ func (r *ReasoningParam) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, r)
 }
 
-// Constrains effort on reasoning for
-// [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-// supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
-// Reducing reasoning effort can result in faster responses and fewer tokens used
-// on reasoning in a response.
-//
-//   - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
-//     reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
-//     calls are supported for all reasoning values in gpt-5.1.
-//   - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
-//     support `none`.
-//   - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-//   - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
+// Constrains effort on reasoning for reasoning models. Currently supported values
+// are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+// reasoning effort can result in faster responses and fewer tokens used on
+// reasoning in a response. Not all reasoning models support every value. See the
+// [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+// model-specific support.
 type ReasoningEffort string
 
 const (
@@ -920,6 +990,7 @@ const (
 	ReasoningEffortMedium  ReasoningEffort = "medium"
 	ReasoningEffortHigh    ReasoningEffort = "high"
 	ReasoningEffortXhigh   ReasoningEffort = "xhigh"
+	ReasoningEffortMax     ReasoningEffort = "max"
 )
 
 // JSON object response format. An older method of generating JSON responses. Using
@@ -927,7 +998,7 @@ const (
 // will not generate JSON without a system or user message instructing it to do so.
 type ResponseFormatJSONObject struct {
 	// The type of response format being defined. Always `json_object`.
-	Type constant.JSONObject `json:"type,required"`
+	Type constant.JSONObject `json:"type" default:"json_object"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Type        respjson.Field
@@ -968,7 +1039,7 @@ func NewResponseFormatJSONObjectParam() ResponseFormatJSONObjectParam {
 // [NewResponseFormatJSONObjectParam].
 type ResponseFormatJSONObjectParam struct {
 	// The type of response format being defined. Always `json_object`.
-	Type constant.JSONObject `json:"type,required"`
+	Type constant.JSONObject `json:"type" default:"json_object"`
 	paramObj
 }
 
@@ -985,9 +1056,9 @@ func (r *ResponseFormatJSONObjectParam) UnmarshalJSON(data []byte) error {
 // [Structured Outputs](https://platform.openai.com/docs/guides/structured-outputs).
 type ResponseFormatJSONSchema struct {
 	// Structured Outputs configuration options, including a JSON Schema.
-	JSONSchema ResponseFormatJSONSchemaJSONSchema `json:"json_schema,required"`
+	JSONSchema ResponseFormatJSONSchemaJSONSchema `json:"json_schema" api:"required"`
 	// The type of response format being defined. Always `json_schema`.
-	Type constant.JSONSchema `json:"type,required"`
+	Type constant.JSONSchema `json:"type" default:"json_schema"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		JSONSchema  respjson.Field
@@ -1017,7 +1088,7 @@ func (r ResponseFormatJSONSchema) ToParam() ResponseFormatJSONSchemaParam {
 type ResponseFormatJSONSchemaJSONSchema struct {
 	// The name of the response format. Must be a-z, A-Z, 0-9, or contain underscores
 	// and dashes, with a maximum length of 64.
-	Name string `json:"name,required"`
+	Name string `json:"name" api:"required"`
 	// A description of what the response format is for, used by the model to determine
 	// how to respond in the format.
 	Description string `json:"description"`
@@ -1029,7 +1100,7 @@ type ResponseFormatJSONSchemaJSONSchema struct {
 	// field. Only a subset of JSON Schema is supported when `strict` is `true`. To
 	// learn more, read the
 	// [Structured Outputs guide](https://platform.openai.com/docs/guides/structured-outputs).
-	Strict bool `json:"strict,nullable"`
+	Strict bool `json:"strict" api:"nullable"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Name        respjson.Field
@@ -1054,11 +1125,11 @@ func (r *ResponseFormatJSONSchemaJSONSchema) UnmarshalJSON(data []byte) error {
 // The properties JSONSchema, Type are required.
 type ResponseFormatJSONSchemaParam struct {
 	// Structured Outputs configuration options, including a JSON Schema.
-	JSONSchema ResponseFormatJSONSchemaJSONSchemaParam `json:"json_schema,omitzero,required"`
+	JSONSchema ResponseFormatJSONSchemaJSONSchemaParam `json:"json_schema,omitzero" api:"required"`
 	// The type of response format being defined. Always `json_schema`.
 	//
 	// This field can be elided, and will marshal its zero value as "json_schema".
-	Type constant.JSONSchema `json:"type,required"`
+	Type constant.JSONSchema `json:"type" default:"json_schema"`
 	paramObj
 }
 
@@ -1076,7 +1147,7 @@ func (r *ResponseFormatJSONSchemaParam) UnmarshalJSON(data []byte) error {
 type ResponseFormatJSONSchemaJSONSchemaParam struct {
 	// The name of the response format. Must be a-z, A-Z, 0-9, or contain underscores
 	// and dashes, with a maximum length of 64.
-	Name string `json:"name,required"`
+	Name string `json:"name" api:"required"`
 	// Whether to enable strict schema adherence when generating the output. If set to
 	// true, the model will always follow the exact schema defined in the `schema`
 	// field. Only a subset of JSON Schema is supported when `strict` is `true`. To
@@ -1103,7 +1174,7 @@ func (r *ResponseFormatJSONSchemaJSONSchemaParam) UnmarshalJSON(data []byte) err
 // Default response format. Used to generate text responses.
 type ResponseFormatText struct {
 	// The type of response format being defined. Always `text`.
-	Type constant.Text `json:"type,required"`
+	Type constant.Text `json:"type" default:"text"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Type        respjson.Field
@@ -1141,7 +1212,7 @@ func NewResponseFormatTextParam() ResponseFormatTextParam {
 // [NewResponseFormatTextParam].
 type ResponseFormatTextParam struct {
 	// The type of response format being defined. Always `text`.
-	Type constant.Text `json:"type,required"`
+	Type constant.Text `json:"type" default:"text"`
 	paramObj
 }
 

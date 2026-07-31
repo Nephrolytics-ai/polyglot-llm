@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 	"slices"
@@ -22,6 +21,8 @@ import (
 	"github.com/openai/openai-go/v3/shared/constant"
 )
 
+// Build Assistants that can call models and use tools.
+//
 // BetaAssistantService contains methods and other services that help with
 // interacting with the openai API.
 //
@@ -45,41 +46,44 @@ func NewBetaAssistantService(opts ...option.RequestOption) (r BetaAssistantServi
 //
 // Deprecated: deprecated
 func (r *BetaAssistantService) New(ctx context.Context, body BetaAssistantNewParams, opts ...option.RequestOption) (res *Assistant, err error) {
-	opts = slices.Concat(r.Options, opts)
+	var preClientOpts = []option.RequestOption{requestconfig.WithBearerAuthSecurity()}
+	opts = slices.Concat(preClientOpts, r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("OpenAI-Beta", "assistants=v2")}, opts...)
 	path := "assistants"
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, body, &res, opts...)
-	return
+	return res, err
 }
 
 // Retrieves an assistant.
 //
 // Deprecated: deprecated
 func (r *BetaAssistantService) Get(ctx context.Context, assistantID string, opts ...option.RequestOption) (res *Assistant, err error) {
-	opts = slices.Concat(r.Options, opts)
+	var preClientOpts = []option.RequestOption{requestconfig.WithBearerAuthSecurity()}
+	opts = slices.Concat(preClientOpts, r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("OpenAI-Beta", "assistants=v2")}, opts...)
 	if assistantID == "" {
 		err = errors.New("missing required assistant_id parameter")
-		return
+		return nil, err
 	}
-	path := fmt.Sprintf("assistants/%s", assistantID)
+	path := requestconfig.FormatPath("assistants/%s", assistantID)
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodGet, path, nil, &res, opts...)
-	return
+	return res, err
 }
 
 // Modifies an assistant.
 //
 // Deprecated: deprecated
 func (r *BetaAssistantService) Update(ctx context.Context, assistantID string, body BetaAssistantUpdateParams, opts ...option.RequestOption) (res *Assistant, err error) {
-	opts = slices.Concat(r.Options, opts)
+	var preClientOpts = []option.RequestOption{requestconfig.WithBearerAuthSecurity()}
+	opts = slices.Concat(preClientOpts, r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("OpenAI-Beta", "assistants=v2")}, opts...)
 	if assistantID == "" {
 		err = errors.New("missing required assistant_id parameter")
-		return
+		return nil, err
 	}
-	path := fmt.Sprintf("assistants/%s", assistantID)
+	path := requestconfig.FormatPath("assistants/%s", assistantID)
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, body, &res, opts...)
-	return
+	return res, err
 }
 
 // Returns a list of assistants.
@@ -87,7 +91,8 @@ func (r *BetaAssistantService) Update(ctx context.Context, assistantID string, b
 // Deprecated: deprecated
 func (r *BetaAssistantService) List(ctx context.Context, query BetaAssistantListParams, opts ...option.RequestOption) (res *pagination.CursorPage[Assistant], err error) {
 	var raw *http.Response
-	opts = slices.Concat(r.Options, opts)
+	var preClientOpts = []option.RequestOption{requestconfig.WithBearerAuthSecurity()}
+	opts = slices.Concat(preClientOpts, r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("OpenAI-Beta", "assistants=v2"), option.WithResponseInto(&raw)}, opts...)
 	path := "assistants"
 	cfg, err := requestconfig.NewRequestConfig(ctx, http.MethodGet, path, query, &res, opts...)
@@ -113,15 +118,16 @@ func (r *BetaAssistantService) ListAutoPaging(ctx context.Context, query BetaAss
 //
 // Deprecated: deprecated
 func (r *BetaAssistantService) Delete(ctx context.Context, assistantID string, opts ...option.RequestOption) (res *AssistantDeleted, err error) {
-	opts = slices.Concat(r.Options, opts)
+	var preClientOpts = []option.RequestOption{requestconfig.WithBearerAuthSecurity()}
+	opts = slices.Concat(preClientOpts, r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("OpenAI-Beta", "assistants=v2")}, opts...)
 	if assistantID == "" {
 		err = errors.New("missing required assistant_id parameter")
-		return
+		return nil, err
 	}
-	path := fmt.Sprintf("assistants/%s", assistantID)
+	path := requestconfig.FormatPath("assistants/%s", assistantID)
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodDelete, path, nil, &res, opts...)
-	return
+	return res, err
 }
 
 // Represents an `assistant` that can call the model and use tools.
@@ -129,35 +135,35 @@ func (r *BetaAssistantService) Delete(ctx context.Context, assistantID string, o
 // Deprecated: deprecated
 type Assistant struct {
 	// The identifier, which can be referenced in API endpoints.
-	ID string `json:"id,required"`
+	ID string `json:"id" api:"required"`
 	// The Unix timestamp (in seconds) for when the assistant was created.
-	CreatedAt int64 `json:"created_at,required"`
+	CreatedAt int64 `json:"created_at" api:"required" format:"unixtime"`
 	// The description of the assistant. The maximum length is 512 characters.
-	Description string `json:"description,required"`
+	Description string `json:"description" api:"required"`
 	// The system instructions that the assistant uses. The maximum length is 256,000
 	// characters.
-	Instructions string `json:"instructions,required"`
+	Instructions string `json:"instructions" api:"required"`
 	// Set of 16 key-value pairs that can be attached to an object. This can be useful
 	// for storing additional information about the object in a structured format, and
 	// querying for objects via API or the dashboard.
 	//
 	// Keys are strings with a maximum length of 64 characters. Values are strings with
 	// a maximum length of 512 characters.
-	Metadata shared.Metadata `json:"metadata,required"`
+	Metadata shared.Metadata `json:"metadata" api:"required"`
 	// ID of the model to use. You can use the
 	// [List models](https://platform.openai.com/docs/api-reference/models/list) API to
 	// see all of your available models, or see our
 	// [Model overview](https://platform.openai.com/docs/models) for descriptions of
 	// them.
-	Model string `json:"model,required"`
+	Model string `json:"model" api:"required"`
 	// The name of the assistant. The maximum length is 256 characters.
-	Name string `json:"name,required"`
+	Name string `json:"name" api:"required"`
 	// The object type, which is always `assistant`.
-	Object constant.Assistant `json:"object,required"`
+	Object constant.Assistant `json:"object" default:"assistant"`
 	// A list of tool enabled on the assistant. There can be a maximum of 128 tools per
 	// assistant. Tools can be of types `code_interpreter`, `file_search`, or
 	// `function`.
-	Tools []AssistantToolUnion `json:"tools,required"`
+	Tools []AssistantToolUnion `json:"tools" api:"required"`
 	// Specifies the format that the model must output. Compatible with
 	// [GPT-4o](https://platform.openai.com/docs/models#gpt-4o),
 	// [GPT-4 Turbo](https://platform.openai.com/docs/models#gpt-4-turbo-and-gpt-4),
@@ -178,22 +184,22 @@ type Assistant struct {
 	// the message content may be partially cut off if `finish_reason="length"`, which
 	// indicates the generation exceeded `max_tokens` or the conversation exceeded the
 	// max context length.
-	ResponseFormat AssistantResponseFormatOptionUnion `json:"response_format,nullable"`
+	ResponseFormat AssistantResponseFormatOptionUnion `json:"response_format" api:"nullable"`
 	// What sampling temperature to use, between 0 and 2. Higher values like 0.8 will
 	// make the output more random, while lower values like 0.2 will make it more
 	// focused and deterministic.
-	Temperature float64 `json:"temperature,nullable"`
+	Temperature float64 `json:"temperature" api:"nullable"`
 	// A set of resources that are used by the assistant's tools. The resources are
 	// specific to the type of tool. For example, the `code_interpreter` tool requires
 	// a list of file IDs, while the `file_search` tool requires a list of vector store
 	// IDs.
-	ToolResources AssistantToolResources `json:"tool_resources,nullable"`
+	ToolResources AssistantToolResources `json:"tool_resources" api:"nullable"`
 	// An alternative to sampling with temperature, called nucleus sampling, where the
 	// model considers the results of the tokens with top_p probability mass. So 0.1
 	// means only the tokens comprising the top 10% probability mass are considered.
 	//
 	// We generally recommend altering this or temperature but not both.
-	TopP float64 `json:"top_p,nullable"`
+	TopP float64 `json:"top_p" api:"nullable"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		ID             respjson.Field
@@ -282,9 +288,9 @@ func (r *AssistantToolResourcesFileSearch) UnmarshalJSON(data []byte) error {
 }
 
 type AssistantDeleted struct {
-	ID      string                    `json:"id,required"`
-	Deleted bool                      `json:"deleted,required"`
-	Object  constant.AssistantDeleted `json:"object,required"`
+	ID      string                    `json:"id" api:"required"`
+	Deleted bool                      `json:"deleted" api:"required"`
+	Object  constant.AssistantDeleted `json:"object" default:"assistant.deleted"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		ID          respjson.Field
@@ -811,8 +817,8 @@ func (r *AssistantStreamEventUnionDataDelta) UnmarshalJSON(data []byte) error {
 type AssistantStreamEventThreadCreated struct {
 	// Represents a thread that contains
 	// [messages](https://platform.openai.com/docs/api-reference/messages).
-	Data  Thread                 `json:"data,required"`
-	Event constant.ThreadCreated `json:"event,required"`
+	Data  Thread                 `json:"data" api:"required"`
+	Event constant.ThreadCreated `json:"event" default:"thread.created"`
 	// Whether to enable input audio transcription.
 	Enabled bool `json:"enabled"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
@@ -836,8 +842,8 @@ func (r *AssistantStreamEventThreadCreated) UnmarshalJSON(data []byte) error {
 type AssistantStreamEventThreadRunCreated struct {
 	// Represents an execution run on a
 	// [thread](https://platform.openai.com/docs/api-reference/threads).
-	Data  Run                       `json:"data,required"`
-	Event constant.ThreadRunCreated `json:"event,required"`
+	Data  Run                       `json:"data" api:"required"`
+	Event constant.ThreadRunCreated `json:"event" default:"thread.run.created"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -858,8 +864,8 @@ func (r *AssistantStreamEventThreadRunCreated) UnmarshalJSON(data []byte) error 
 type AssistantStreamEventThreadRunQueued struct {
 	// Represents an execution run on a
 	// [thread](https://platform.openai.com/docs/api-reference/threads).
-	Data  Run                      `json:"data,required"`
-	Event constant.ThreadRunQueued `json:"event,required"`
+	Data  Run                      `json:"data" api:"required"`
+	Event constant.ThreadRunQueued `json:"event" default:"thread.run.queued"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -880,8 +886,8 @@ func (r *AssistantStreamEventThreadRunQueued) UnmarshalJSON(data []byte) error {
 type AssistantStreamEventThreadRunInProgress struct {
 	// Represents an execution run on a
 	// [thread](https://platform.openai.com/docs/api-reference/threads).
-	Data  Run                          `json:"data,required"`
-	Event constant.ThreadRunInProgress `json:"event,required"`
+	Data  Run                          `json:"data" api:"required"`
+	Event constant.ThreadRunInProgress `json:"event" default:"thread.run.in_progress"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -902,8 +908,8 @@ func (r *AssistantStreamEventThreadRunInProgress) UnmarshalJSON(data []byte) err
 type AssistantStreamEventThreadRunRequiresAction struct {
 	// Represents an execution run on a
 	// [thread](https://platform.openai.com/docs/api-reference/threads).
-	Data  Run                              `json:"data,required"`
-	Event constant.ThreadRunRequiresAction `json:"event,required"`
+	Data  Run                              `json:"data" api:"required"`
+	Event constant.ThreadRunRequiresAction `json:"event" default:"thread.run.requires_action"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -924,8 +930,8 @@ func (r *AssistantStreamEventThreadRunRequiresAction) UnmarshalJSON(data []byte)
 type AssistantStreamEventThreadRunCompleted struct {
 	// Represents an execution run on a
 	// [thread](https://platform.openai.com/docs/api-reference/threads).
-	Data  Run                         `json:"data,required"`
-	Event constant.ThreadRunCompleted `json:"event,required"`
+	Data  Run                         `json:"data" api:"required"`
+	Event constant.ThreadRunCompleted `json:"event" default:"thread.run.completed"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -946,8 +952,8 @@ func (r *AssistantStreamEventThreadRunCompleted) UnmarshalJSON(data []byte) erro
 type AssistantStreamEventThreadRunIncomplete struct {
 	// Represents an execution run on a
 	// [thread](https://platform.openai.com/docs/api-reference/threads).
-	Data  Run                          `json:"data,required"`
-	Event constant.ThreadRunIncomplete `json:"event,required"`
+	Data  Run                          `json:"data" api:"required"`
+	Event constant.ThreadRunIncomplete `json:"event" default:"thread.run.incomplete"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -968,8 +974,8 @@ func (r *AssistantStreamEventThreadRunIncomplete) UnmarshalJSON(data []byte) err
 type AssistantStreamEventThreadRunFailed struct {
 	// Represents an execution run on a
 	// [thread](https://platform.openai.com/docs/api-reference/threads).
-	Data  Run                      `json:"data,required"`
-	Event constant.ThreadRunFailed `json:"event,required"`
+	Data  Run                      `json:"data" api:"required"`
+	Event constant.ThreadRunFailed `json:"event" default:"thread.run.failed"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -990,8 +996,8 @@ func (r *AssistantStreamEventThreadRunFailed) UnmarshalJSON(data []byte) error {
 type AssistantStreamEventThreadRunCancelling struct {
 	// Represents an execution run on a
 	// [thread](https://platform.openai.com/docs/api-reference/threads).
-	Data  Run                          `json:"data,required"`
-	Event constant.ThreadRunCancelling `json:"event,required"`
+	Data  Run                          `json:"data" api:"required"`
+	Event constant.ThreadRunCancelling `json:"event" default:"thread.run.cancelling"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -1012,8 +1018,8 @@ func (r *AssistantStreamEventThreadRunCancelling) UnmarshalJSON(data []byte) err
 type AssistantStreamEventThreadRunCancelled struct {
 	// Represents an execution run on a
 	// [thread](https://platform.openai.com/docs/api-reference/threads).
-	Data  Run                         `json:"data,required"`
-	Event constant.ThreadRunCancelled `json:"event,required"`
+	Data  Run                         `json:"data" api:"required"`
+	Event constant.ThreadRunCancelled `json:"event" default:"thread.run.cancelled"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -1034,8 +1040,8 @@ func (r *AssistantStreamEventThreadRunCancelled) UnmarshalJSON(data []byte) erro
 type AssistantStreamEventThreadRunExpired struct {
 	// Represents an execution run on a
 	// [thread](https://platform.openai.com/docs/api-reference/threads).
-	Data  Run                       `json:"data,required"`
-	Event constant.ThreadRunExpired `json:"event,required"`
+	Data  Run                       `json:"data" api:"required"`
+	Event constant.ThreadRunExpired `json:"event" default:"thread.run.expired"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -1056,8 +1062,8 @@ func (r *AssistantStreamEventThreadRunExpired) UnmarshalJSON(data []byte) error 
 // is created.
 type AssistantStreamEventThreadRunStepCreated struct {
 	// Represents a step in execution of a run.
-	Data  RunStep                       `json:"data,required"`
-	Event constant.ThreadRunStepCreated `json:"event,required"`
+	Data  RunStep                       `json:"data" api:"required"`
+	Event constant.ThreadRunStepCreated `json:"event" default:"thread.run.step.created"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -1078,8 +1084,8 @@ func (r *AssistantStreamEventThreadRunStepCreated) UnmarshalJSON(data []byte) er
 // moves to an `in_progress` state.
 type AssistantStreamEventThreadRunStepInProgress struct {
 	// Represents a step in execution of a run.
-	Data  RunStep                          `json:"data,required"`
-	Event constant.ThreadRunStepInProgress `json:"event,required"`
+	Data  RunStep                          `json:"data" api:"required"`
+	Event constant.ThreadRunStepInProgress `json:"event" default:"thread.run.step.in_progress"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -1101,8 +1107,8 @@ func (r *AssistantStreamEventThreadRunStepInProgress) UnmarshalJSON(data []byte)
 type AssistantStreamEventThreadRunStepDelta struct {
 	// Represents a run step delta i.e. any changed fields on a run step during
 	// streaming.
-	Data  RunStepDeltaEvent           `json:"data,required"`
-	Event constant.ThreadRunStepDelta `json:"event,required"`
+	Data  RunStepDeltaEvent           `json:"data" api:"required"`
+	Event constant.ThreadRunStepDelta `json:"event" default:"thread.run.step.delta"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -1123,8 +1129,8 @@ func (r *AssistantStreamEventThreadRunStepDelta) UnmarshalJSON(data []byte) erro
 // is completed.
 type AssistantStreamEventThreadRunStepCompleted struct {
 	// Represents a step in execution of a run.
-	Data  RunStep                         `json:"data,required"`
-	Event constant.ThreadRunStepCompleted `json:"event,required"`
+	Data  RunStep                         `json:"data" api:"required"`
+	Event constant.ThreadRunStepCompleted `json:"event" default:"thread.run.step.completed"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -1145,8 +1151,8 @@ func (r *AssistantStreamEventThreadRunStepCompleted) UnmarshalJSON(data []byte) 
 // fails.
 type AssistantStreamEventThreadRunStepFailed struct {
 	// Represents a step in execution of a run.
-	Data  RunStep                      `json:"data,required"`
-	Event constant.ThreadRunStepFailed `json:"event,required"`
+	Data  RunStep                      `json:"data" api:"required"`
+	Event constant.ThreadRunStepFailed `json:"event" default:"thread.run.step.failed"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -1167,8 +1173,8 @@ func (r *AssistantStreamEventThreadRunStepFailed) UnmarshalJSON(data []byte) err
 // is cancelled.
 type AssistantStreamEventThreadRunStepCancelled struct {
 	// Represents a step in execution of a run.
-	Data  RunStep                         `json:"data,required"`
-	Event constant.ThreadRunStepCancelled `json:"event,required"`
+	Data  RunStep                         `json:"data" api:"required"`
+	Event constant.ThreadRunStepCancelled `json:"event" default:"thread.run.step.cancelled"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -1189,8 +1195,8 @@ func (r *AssistantStreamEventThreadRunStepCancelled) UnmarshalJSON(data []byte) 
 // expires.
 type AssistantStreamEventThreadRunStepExpired struct {
 	// Represents a step in execution of a run.
-	Data  RunStep                       `json:"data,required"`
-	Event constant.ThreadRunStepExpired `json:"event,required"`
+	Data  RunStep                       `json:"data" api:"required"`
+	Event constant.ThreadRunStepExpired `json:"event" default:"thread.run.step.expired"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -1212,8 +1218,8 @@ func (r *AssistantStreamEventThreadRunStepExpired) UnmarshalJSON(data []byte) er
 type AssistantStreamEventThreadMessageCreated struct {
 	// Represents a message within a
 	// [thread](https://platform.openai.com/docs/api-reference/threads).
-	Data  Message                       `json:"data,required"`
-	Event constant.ThreadMessageCreated `json:"event,required"`
+	Data  Message                       `json:"data" api:"required"`
+	Event constant.ThreadMessageCreated `json:"event" default:"thread.message.created"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -1235,8 +1241,8 @@ func (r *AssistantStreamEventThreadMessageCreated) UnmarshalJSON(data []byte) er
 type AssistantStreamEventThreadMessageInProgress struct {
 	// Represents a message within a
 	// [thread](https://platform.openai.com/docs/api-reference/threads).
-	Data  Message                          `json:"data,required"`
-	Event constant.ThreadMessageInProgress `json:"event,required"`
+	Data  Message                          `json:"data" api:"required"`
+	Event constant.ThreadMessageInProgress `json:"event" default:"thread.message.in_progress"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -1258,8 +1264,8 @@ func (r *AssistantStreamEventThreadMessageInProgress) UnmarshalJSON(data []byte)
 type AssistantStreamEventThreadMessageDelta struct {
 	// Represents a message delta i.e. any changed fields on a message during
 	// streaming.
-	Data  MessageDeltaEvent           `json:"data,required"`
-	Event constant.ThreadMessageDelta `json:"event,required"`
+	Data  MessageDeltaEvent           `json:"data" api:"required"`
+	Event constant.ThreadMessageDelta `json:"event" default:"thread.message.delta"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -1281,8 +1287,8 @@ func (r *AssistantStreamEventThreadMessageDelta) UnmarshalJSON(data []byte) erro
 type AssistantStreamEventThreadMessageCompleted struct {
 	// Represents a message within a
 	// [thread](https://platform.openai.com/docs/api-reference/threads).
-	Data  Message                         `json:"data,required"`
-	Event constant.ThreadMessageCompleted `json:"event,required"`
+	Data  Message                         `json:"data" api:"required"`
+	Event constant.ThreadMessageCompleted `json:"event" default:"thread.message.completed"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -1304,8 +1310,8 @@ func (r *AssistantStreamEventThreadMessageCompleted) UnmarshalJSON(data []byte) 
 type AssistantStreamEventThreadMessageIncomplete struct {
 	// Represents a message within a
 	// [thread](https://platform.openai.com/docs/api-reference/threads).
-	Data  Message                          `json:"data,required"`
-	Event constant.ThreadMessageIncomplete `json:"event,required"`
+	Data  Message                          `json:"data" api:"required"`
+	Event constant.ThreadMessageIncomplete `json:"event" default:"thread.message.incomplete"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -1325,8 +1331,8 @@ func (r *AssistantStreamEventThreadMessageIncomplete) UnmarshalJSON(data []byte)
 // [error](https://platform.openai.com/docs/guides/error-codes#api-errors) occurs.
 // This can happen due to an internal server error or a timeout.
 type AssistantStreamEventErrorEvent struct {
-	Data  shared.ErrorObject `json:"data,required"`
-	Event constant.Error     `json:"event,required"`
+	Data  shared.ErrorObject `json:"data" api:"required"`
+	Event constant.Error     `json:"event" default:"error"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -1498,7 +1504,7 @@ func init() {
 
 type CodeInterpreterTool struct {
 	// The type of tool being defined: `code_interpreter`
-	Type constant.CodeInterpreter `json:"type,required"`
+	Type constant.CodeInterpreter `json:"type" default:"code_interpreter"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Type        respjson.Field
@@ -1532,7 +1538,7 @@ func NewCodeInterpreterToolParam() CodeInterpreterToolParam {
 // [NewCodeInterpreterToolParam].
 type CodeInterpreterToolParam struct {
 	// The type of tool being defined: `code_interpreter`
-	Type constant.CodeInterpreter `json:"type,required"`
+	Type constant.CodeInterpreter `json:"type" default:"code_interpreter"`
 	paramObj
 }
 
@@ -1546,7 +1552,7 @@ func (r *CodeInterpreterToolParam) UnmarshalJSON(data []byte) error {
 
 type FileSearchTool struct {
 	// The type of tool being defined: `file_search`
-	Type constant.FileSearch `json:"type,required"`
+	Type constant.FileSearch `json:"type" default:"file_search"`
 	// Overrides for the file search tool.
 	FileSearch FileSearchToolFileSearch `json:"file_search"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
@@ -1615,7 +1621,7 @@ func (r *FileSearchToolFileSearch) UnmarshalJSON(data []byte) error {
 type FileSearchToolFileSearchRankingOptions struct {
 	// The score threshold for the file search. All values must be a floating point
 	// number between 0 and 1.
-	ScoreThreshold float64 `json:"score_threshold,required"`
+	ScoreThreshold float64 `json:"score_threshold" api:"required"`
 	// The ranker to use for the file search. If not specified will use the `auto`
 	// ranker.
 	//
@@ -1643,7 +1649,7 @@ type FileSearchToolParam struct {
 	// The type of tool being defined: `file_search`
 	//
 	// This field can be elided, and will marshal its zero value as "file_search".
-	Type constant.FileSearch `json:"type,required"`
+	Type constant.FileSearch `json:"type" default:"file_search"`
 	paramObj
 }
 
@@ -1695,7 +1701,7 @@ func (r *FileSearchToolFileSearchParam) UnmarshalJSON(data []byte) error {
 type FileSearchToolFileSearchRankingOptionsParam struct {
 	// The score threshold for the file search. All values must be a floating point
 	// number between 0 and 1.
-	ScoreThreshold float64 `json:"score_threshold,required"`
+	ScoreThreshold float64 `json:"score_threshold" api:"required"`
 	// The ranker to use for the file search. If not specified will use the `auto`
 	// ranker.
 	//
@@ -1719,9 +1725,9 @@ func init() {
 }
 
 type FunctionTool struct {
-	Function shared.FunctionDefinition `json:"function,required"`
+	Function shared.FunctionDefinition `json:"function" api:"required"`
 	// The type of tool being defined: `function`
-	Type constant.Function `json:"type,required"`
+	Type constant.Function `json:"type" default:"function"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Function    respjson.Field
@@ -1748,11 +1754,11 @@ func (r FunctionTool) ToParam() FunctionToolParam {
 
 // The properties Function, Type are required.
 type FunctionToolParam struct {
-	Function shared.FunctionDefinitionParam `json:"function,omitzero,required"`
+	Function shared.FunctionDefinitionParam `json:"function,omitzero" api:"required"`
 	// The type of tool being defined: `function`
 	//
 	// This field can be elided, and will marshal its zero value as "function".
-	Type constant.Function `json:"type,required"`
+	Type constant.Function `json:"type" default:"function"`
 	paramObj
 }
 
@@ -1770,7 +1776,7 @@ type BetaAssistantNewParams struct {
 	// see all of your available models, or see our
 	// [Model overview](https://platform.openai.com/docs/models) for descriptions of
 	// them.
-	Model shared.ChatModel `json:"model,omitzero,required"`
+	Model shared.ChatModel `json:"model,omitzero" api:"required"`
 	// The description of the assistant. The maximum length is 512 characters.
 	Description param.Opt[string] `json:"description,omitzero"`
 	// The system instructions that the assistant uses. The maximum length is 256,000
@@ -1795,21 +1801,14 @@ type BetaAssistantNewParams struct {
 	// Keys are strings with a maximum length of 64 characters. Values are strings with
 	// a maximum length of 512 characters.
 	Metadata shared.Metadata `json:"metadata,omitzero"`
-	// Constrains effort on reasoning for
-	// [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-	// supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
-	// Reducing reasoning effort can result in faster responses and fewer tokens used
-	// on reasoning in a response.
+	// Constrains effort on reasoning for reasoning models. Currently supported values
+	// are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+	// reasoning effort can result in faster responses and fewer tokens used on
+	// reasoning in a response. Not all reasoning models support every value. See the
+	// [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+	// model-specific support.
 	//
-	//   - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
-	//     reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
-	//     calls are supported for all reasoning values in gpt-5.1.
-	//   - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
-	//     support `none`.
-	//   - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-	//   - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
-	//
-	// Any of "none", "minimal", "low", "medium", "high", "xhigh".
+	// Any of "none", "minimal", "low", "medium", "high", "xhigh", "max".
 	ReasoningEffort shared.ReasoningEffort `json:"reasoning_effort,omitzero"`
 	// A set of resources that are used by the assistant's tools. The resources are
 	// specific to the type of tool. For example, the `code_interpreter` tool requires
@@ -1920,8 +1919,9 @@ type BetaAssistantNewParamsToolResourcesFileSearchVectorStore struct {
 	// strategy.
 	ChunkingStrategy BetaAssistantNewParamsToolResourcesFileSearchVectorStoreChunkingStrategyUnion `json:"chunking_strategy,omitzero"`
 	// A list of [file](https://platform.openai.com/docs/api-reference/files) IDs to
-	// add to the vector store. There can be a maximum of 10000 files in a vector
-	// store.
+	// add to the vector store. For vector stores created before Nov 2025, there can be
+	// a maximum of 10,000 files in a vector store. For vector stores created starting
+	// in Nov 2025, the limit is 100,000,000 files.
 	FileIDs []string `json:"file_ids,omitzero"`
 	paramObj
 }
@@ -1998,7 +1998,7 @@ func NewBetaAssistantNewParamsToolResourcesFileSearchVectorStoreChunkingStrategy
 // [NewBetaAssistantNewParamsToolResourcesFileSearchVectorStoreChunkingStrategyAuto].
 type BetaAssistantNewParamsToolResourcesFileSearchVectorStoreChunkingStrategyAuto struct {
 	// Always `auto`.
-	Type constant.Auto `json:"type,required"`
+	Type constant.Auto `json:"type" default:"auto"`
 	paramObj
 }
 
@@ -2012,11 +2012,11 @@ func (r *BetaAssistantNewParamsToolResourcesFileSearchVectorStoreChunkingStrateg
 
 // The properties Static, Type are required.
 type BetaAssistantNewParamsToolResourcesFileSearchVectorStoreChunkingStrategyStatic struct {
-	Static BetaAssistantNewParamsToolResourcesFileSearchVectorStoreChunkingStrategyStaticStatic `json:"static,omitzero,required"`
+	Static BetaAssistantNewParamsToolResourcesFileSearchVectorStoreChunkingStrategyStaticStatic `json:"static,omitzero" api:"required"`
 	// Always `static`.
 	//
 	// This field can be elided, and will marshal its zero value as "static".
-	Type constant.Static `json:"type,required"`
+	Type constant.Static `json:"type" default:"static"`
 	paramObj
 }
 
@@ -2033,10 +2033,10 @@ type BetaAssistantNewParamsToolResourcesFileSearchVectorStoreChunkingStrategySta
 	// The number of tokens that overlap between chunks. The default value is `400`.
 	//
 	// Note that the overlap must not exceed half of `max_chunk_size_tokens`.
-	ChunkOverlapTokens int64 `json:"chunk_overlap_tokens,required"`
+	ChunkOverlapTokens int64 `json:"chunk_overlap_tokens" api:"required"`
 	// The maximum number of tokens in each chunk. The default value is `800`. The
 	// minimum value is `100` and the maximum value is `4096`.
-	MaxChunkSizeTokens int64 `json:"max_chunk_size_tokens,required"`
+	MaxChunkSizeTokens int64 `json:"max_chunk_size_tokens" api:"required"`
 	paramObj
 }
 
@@ -2073,21 +2073,14 @@ type BetaAssistantUpdateParams struct {
 	// Keys are strings with a maximum length of 64 characters. Values are strings with
 	// a maximum length of 512 characters.
 	Metadata shared.Metadata `json:"metadata,omitzero"`
-	// Constrains effort on reasoning for
-	// [reasoning models](https://platform.openai.com/docs/guides/reasoning). Currently
-	// supported values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`.
-	// Reducing reasoning effort can result in faster responses and fewer tokens used
-	// on reasoning in a response.
+	// Constrains effort on reasoning for reasoning models. Currently supported values
+	// are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Reducing
+	// reasoning effort can result in faster responses and fewer tokens used on
+	// reasoning in a response. Not all reasoning models support every value. See the
+	// [reasoning guide](https://platform.openai.com/docs/guides/reasoning) for
+	// model-specific support.
 	//
-	//   - `gpt-5.1` defaults to `none`, which does not perform reasoning. The supported
-	//     reasoning values for `gpt-5.1` are `none`, `low`, `medium`, and `high`. Tool
-	//     calls are supported for all reasoning values in gpt-5.1.
-	//   - All models before `gpt-5.1` default to `medium` reasoning effort, and do not
-	//     support `none`.
-	//   - The `gpt-5-pro` model defaults to (and only supports) `high` reasoning effort.
-	//   - `xhigh` is supported for all models after `gpt-5.1-codex-max`.
-	//
-	// Any of "none", "minimal", "low", "medium", "high", "xhigh".
+	// Any of "none", "minimal", "low", "medium", "high", "xhigh", "max".
 	ReasoningEffort shared.ReasoningEffort `json:"reasoning_effort,omitzero"`
 	// A set of resources that are used by the assistant's tools. The resources are
 	// specific to the type of tool. For example, the `code_interpreter` tool requires

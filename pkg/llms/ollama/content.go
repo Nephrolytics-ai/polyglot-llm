@@ -517,6 +517,7 @@ func (c *client) chat(ctx context.Context, request ollamaChatRequest) (*ollamaCh
 	}
 	httpRequest.Header.Set("Content-Type", "application/json")
 	httpRequest.Header.Set("Accept", "application/json")
+	c.applyAuthHeader(httpRequest.Header)
 
 	httpClient := &http.Client{Timeout: 180 * time.Second}
 	httpResponse, err := httpClient.Do(httpRequest)

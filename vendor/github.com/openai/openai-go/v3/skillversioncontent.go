@@ -5,7 +5,6 @@ package openai
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"slices"
 
@@ -32,19 +31,20 @@ func NewSkillVersionContentService(opts ...option.RequestOption) (r SkillVersion
 	return
 }
 
-// Get Skill Version Content
+// Download a skill version zip bundle.
 func (r *SkillVersionContentService) Get(ctx context.Context, skillID string, version string, opts ...option.RequestOption) (res *http.Response, err error) {
-	opts = slices.Concat(r.Options, opts)
+	var preClientOpts = []option.RequestOption{requestconfig.WithBearerAuthSecurity()}
+	opts = slices.Concat(preClientOpts, r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("Accept", "application/binary")}, opts...)
 	if skillID == "" {
 		err = errors.New("missing required skill_id parameter")
-		return
+		return nil, err
 	}
 	if version == "" {
 		err = errors.New("missing required version parameter")
-		return
+		return nil, err
 	}
-	path := fmt.Sprintf("skills/%s/versions/%s/content", skillID, version)
+	path := requestconfig.FormatPath("skills/%s/versions/%s/content", skillID, version)
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodGet, path, nil, &res, opts...)
-	return
+	return res, err
 }

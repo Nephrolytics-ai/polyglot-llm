@@ -113,6 +113,7 @@ func (c *client) embed(ctx context.Context, modelName string, inputs []string) (
 		return nil, utils.WrapIfNotNil(err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	c.applyAuthHeader(httpReq.Header)
 
 	httpClient := &http.Client{Timeout: 120 * time.Second}
 	httpResp, err := httpClient.Do(httpReq)
@@ -162,6 +163,7 @@ func (c *client) embed(ctx context.Context, modelName string, inputs []string) (
 			return nil, utils.WrapIfNotNil(err)
 		}
 		legacyReq.Header.Set("Content-Type", "application/json")
+		c.applyAuthHeader(legacyReq.Header)
 
 		legacyResp, err := httpClient.Do(legacyReq)
 		if err != nil {
