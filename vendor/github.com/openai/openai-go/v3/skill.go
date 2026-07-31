@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -47,42 +46,46 @@ func NewSkillService(opts ...option.RequestOption) (r SkillService) {
 	return
 }
 
-// Create Skill
+// Create a new skill.
 func (r *SkillService) New(ctx context.Context, body SkillNewParams, opts ...option.RequestOption) (res *Skill, err error) {
-	opts = slices.Concat(r.Options, opts)
+	var preClientOpts = []option.RequestOption{requestconfig.WithBearerAuthSecurity()}
+	opts = slices.Concat(preClientOpts, r.Options, opts)
 	path := "skills"
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, body, &res, opts...)
-	return
+	return res, err
 }
 
-// Get Skill
+// Get a skill by its ID.
 func (r *SkillService) Get(ctx context.Context, skillID string, opts ...option.RequestOption) (res *Skill, err error) {
-	opts = slices.Concat(r.Options, opts)
+	var preClientOpts = []option.RequestOption{requestconfig.WithBearerAuthSecurity()}
+	opts = slices.Concat(preClientOpts, r.Options, opts)
 	if skillID == "" {
 		err = errors.New("missing required skill_id parameter")
-		return
+		return nil, err
 	}
-	path := fmt.Sprintf("skills/%s", skillID)
+	path := requestconfig.FormatPath("skills/%s", skillID)
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodGet, path, nil, &res, opts...)
-	return
+	return res, err
 }
 
-// Update Skill Default Version
+// Update the default version pointer for a skill.
 func (r *SkillService) Update(ctx context.Context, skillID string, body SkillUpdateParams, opts ...option.RequestOption) (res *Skill, err error) {
-	opts = slices.Concat(r.Options, opts)
+	var preClientOpts = []option.RequestOption{requestconfig.WithBearerAuthSecurity()}
+	opts = slices.Concat(preClientOpts, r.Options, opts)
 	if skillID == "" {
 		err = errors.New("missing required skill_id parameter")
-		return
+		return nil, err
 	}
-	path := fmt.Sprintf("skills/%s", skillID)
+	path := requestconfig.FormatPath("skills/%s", skillID)
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, body, &res, opts...)
-	return
+	return res, err
 }
 
-// List Skills
+// List all skills for the current project.
 func (r *SkillService) List(ctx context.Context, query SkillListParams, opts ...option.RequestOption) (res *pagination.CursorPage[Skill], err error) {
 	var raw *http.Response
-	opts = slices.Concat(r.Options, opts)
+	var preClientOpts = []option.RequestOption{requestconfig.WithBearerAuthSecurity()}
+	opts = slices.Concat(preClientOpts, r.Options, opts)
 	opts = append([]option.RequestOption{option.WithResponseInto(&raw)}, opts...)
 	path := "skills"
 	cfg, err := requestconfig.NewRequestConfig(ctx, http.MethodGet, path, query, &res, opts...)
@@ -97,27 +100,28 @@ func (r *SkillService) List(ctx context.Context, query SkillListParams, opts ...
 	return res, nil
 }
 
-// List Skills
+// List all skills for the current project.
 func (r *SkillService) ListAutoPaging(ctx context.Context, query SkillListParams, opts ...option.RequestOption) *pagination.CursorPageAutoPager[Skill] {
 	return pagination.NewCursorPageAutoPager(r.List(ctx, query, opts...))
 }
 
-// Delete Skill
+// Delete a skill by its ID.
 func (r *SkillService) Delete(ctx context.Context, skillID string, opts ...option.RequestOption) (res *DeletedSkill, err error) {
-	opts = slices.Concat(r.Options, opts)
+	var preClientOpts = []option.RequestOption{requestconfig.WithBearerAuthSecurity()}
+	opts = slices.Concat(preClientOpts, r.Options, opts)
 	if skillID == "" {
 		err = errors.New("missing required skill_id parameter")
-		return
+		return nil, err
 	}
-	path := fmt.Sprintf("skills/%s", skillID)
+	path := requestconfig.FormatPath("skills/%s", skillID)
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodDelete, path, nil, &res, opts...)
-	return
+	return res, err
 }
 
 type DeletedSkill struct {
-	ID      string                `json:"id,required"`
-	Deleted bool                  `json:"deleted,required"`
-	Object  constant.SkillDeleted `json:"object,required"`
+	ID      string                `json:"id" api:"required"`
+	Deleted bool                  `json:"deleted" api:"required"`
+	Object  constant.SkillDeleted `json:"object" default:"skill.deleted"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		ID          respjson.Field
@@ -136,19 +140,19 @@ func (r *DeletedSkill) UnmarshalJSON(data []byte) error {
 
 type Skill struct {
 	// Unique identifier for the skill.
-	ID string `json:"id,required"`
+	ID string `json:"id" api:"required"`
 	// Unix timestamp (seconds) for when the skill was created.
-	CreatedAt int64 `json:"created_at,required"`
+	CreatedAt int64 `json:"created_at" api:"required" format:"unixtime"`
 	// Default version for the skill.
-	DefaultVersion string `json:"default_version,required"`
+	DefaultVersion string `json:"default_version" api:"required"`
 	// Description of the skill.
-	Description string `json:"description,required"`
+	Description string `json:"description" api:"required"`
 	// Latest version for the skill.
-	LatestVersion string `json:"latest_version,required"`
+	LatestVersion string `json:"latest_version" api:"required"`
 	// Name of the skill.
-	Name string `json:"name,required"`
+	Name string `json:"name" api:"required"`
 	// The object type, which is `skill`.
-	Object constant.Skill `json:"object,required"`
+	Object constant.Skill `json:"object" default:"skill"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		ID             respjson.Field
@@ -171,15 +175,15 @@ func (r *Skill) UnmarshalJSON(data []byte) error {
 
 type SkillList struct {
 	// A list of items
-	Data []Skill `json:"data,required"`
+	Data []Skill `json:"data" api:"required"`
 	// The ID of the first item in the list.
-	FirstID string `json:"first_id,required"`
+	FirstID string `json:"first_id" api:"required"`
 	// Whether there are more items available.
-	HasMore bool `json:"has_more,required"`
+	HasMore bool `json:"has_more" api:"required"`
 	// The ID of the last item in the list.
-	LastID string `json:"last_id,required"`
+	LastID string `json:"last_id" api:"required"`
 	// The type of object returned, must be `list`.
-	Object constant.List `json:"object,required"`
+	Object constant.List `json:"object" default:"list"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Data        respjson.Field
@@ -249,7 +253,7 @@ func (u *SkillNewParamsFilesUnion) asAny() any {
 
 type SkillUpdateParams struct {
 	// The skill version number to set as default.
-	DefaultVersion string `json:"default_version,required"`
+	DefaultVersion string `json:"default_version" api:"required"`
 	paramObj
 }
 

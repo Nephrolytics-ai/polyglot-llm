@@ -15,6 +15,8 @@ import (
 	"github.com/openai/openai-go/v3/packages/respjson"
 )
 
+// Manage fine-tuning jobs to tailor a model to your specific training data.
+//
 // FineTuningAlphaGraderService contains methods and other services that help with
 // interacting with the openai API.
 //
@@ -36,25 +38,27 @@ func NewFineTuningAlphaGraderService(opts ...option.RequestOption) (r FineTuning
 
 // Run a grader.
 func (r *FineTuningAlphaGraderService) Run(ctx context.Context, body FineTuningAlphaGraderRunParams, opts ...option.RequestOption) (res *FineTuningAlphaGraderRunResponse, err error) {
-	opts = slices.Concat(r.Options, opts)
+	var preClientOpts = []option.RequestOption{requestconfig.WithBearerAuthSecurity()}
+	opts = slices.Concat(preClientOpts, r.Options, opts)
 	path := "fine_tuning/alpha/graders/run"
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, body, &res, opts...)
-	return
+	return res, err
 }
 
 // Validate a grader.
 func (r *FineTuningAlphaGraderService) Validate(ctx context.Context, body FineTuningAlphaGraderValidateParams, opts ...option.RequestOption) (res *FineTuningAlphaGraderValidateResponse, err error) {
-	opts = slices.Concat(r.Options, opts)
+	var preClientOpts = []option.RequestOption{requestconfig.WithBearerAuthSecurity()}
+	opts = slices.Concat(preClientOpts, r.Options, opts)
 	path := "fine_tuning/alpha/graders/validate"
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, body, &res, opts...)
-	return
+	return res, err
 }
 
 type FineTuningAlphaGraderRunResponse struct {
-	Metadata                      FineTuningAlphaGraderRunResponseMetadata `json:"metadata,required"`
-	ModelGraderTokenUsagePerModel map[string]any                           `json:"model_grader_token_usage_per_model,required"`
-	Reward                        float64                                  `json:"reward,required"`
-	SubRewards                    map[string]any                           `json:"sub_rewards,required"`
+	Metadata                      FineTuningAlphaGraderRunResponseMetadata `json:"metadata" api:"required"`
+	ModelGraderTokenUsagePerModel map[string]any                           `json:"model_grader_token_usage_per_model" api:"required"`
+	Reward                        float64                                  `json:"reward" api:"required"`
+	SubRewards                    map[string]any                           `json:"sub_rewards" api:"required"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Metadata                      respjson.Field
@@ -73,13 +77,13 @@ func (r *FineTuningAlphaGraderRunResponse) UnmarshalJSON(data []byte) error {
 }
 
 type FineTuningAlphaGraderRunResponseMetadata struct {
-	Errors           FineTuningAlphaGraderRunResponseMetadataErrors `json:"errors,required"`
-	ExecutionTime    float64                                        `json:"execution_time,required"`
-	Name             string                                         `json:"name,required"`
-	SampledModelName string                                         `json:"sampled_model_name,required"`
-	Scores           map[string]any                                 `json:"scores,required"`
-	TokenUsage       int64                                          `json:"token_usage,required"`
-	Type             string                                         `json:"type,required"`
+	Errors           FineTuningAlphaGraderRunResponseMetadataErrors `json:"errors" api:"required"`
+	ExecutionTime    float64                                        `json:"execution_time" api:"required"`
+	Name             string                                         `json:"name" api:"required"`
+	SampledModelName string                                         `json:"sampled_model_name" api:"required"`
+	Scores           map[string]any                                 `json:"scores" api:"required"`
+	TokenUsage       int64                                          `json:"token_usage" api:"required"`
+	Type             string                                         `json:"type" api:"required"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Errors           respjson.Field
@@ -101,20 +105,20 @@ func (r *FineTuningAlphaGraderRunResponseMetadata) UnmarshalJSON(data []byte) er
 }
 
 type FineTuningAlphaGraderRunResponseMetadataErrors struct {
-	FormulaParseError               bool   `json:"formula_parse_error,required"`
-	InvalidVariableError            bool   `json:"invalid_variable_error,required"`
-	ModelGraderParseError           bool   `json:"model_grader_parse_error,required"`
-	ModelGraderRefusalError         bool   `json:"model_grader_refusal_error,required"`
-	ModelGraderServerError          bool   `json:"model_grader_server_error,required"`
-	ModelGraderServerErrorDetails   string `json:"model_grader_server_error_details,required"`
-	OtherError                      bool   `json:"other_error,required"`
-	PythonGraderRuntimeError        bool   `json:"python_grader_runtime_error,required"`
-	PythonGraderRuntimeErrorDetails string `json:"python_grader_runtime_error_details,required"`
-	PythonGraderServerError         bool   `json:"python_grader_server_error,required"`
-	PythonGraderServerErrorType     string `json:"python_grader_server_error_type,required"`
-	SampleParseError                bool   `json:"sample_parse_error,required"`
-	TruncatedObservationError       bool   `json:"truncated_observation_error,required"`
-	UnresponsiveRewardError         bool   `json:"unresponsive_reward_error,required"`
+	FormulaParseError               bool   `json:"formula_parse_error" api:"required"`
+	InvalidVariableError            bool   `json:"invalid_variable_error" api:"required"`
+	ModelGraderParseError           bool   `json:"model_grader_parse_error" api:"required"`
+	ModelGraderRefusalError         bool   `json:"model_grader_refusal_error" api:"required"`
+	ModelGraderServerError          bool   `json:"model_grader_server_error" api:"required"`
+	ModelGraderServerErrorDetails   string `json:"model_grader_server_error_details" api:"required"`
+	OtherError                      bool   `json:"other_error" api:"required"`
+	PythonGraderRuntimeError        bool   `json:"python_grader_runtime_error" api:"required"`
+	PythonGraderRuntimeErrorDetails string `json:"python_grader_runtime_error_details" api:"required"`
+	PythonGraderServerError         bool   `json:"python_grader_server_error" api:"required"`
+	PythonGraderServerErrorType     string `json:"python_grader_server_error_type" api:"required"`
+	SampleParseError                bool   `json:"sample_parse_error" api:"required"`
+	TruncatedObservationError       bool   `json:"truncated_observation_error" api:"required"`
+	UnresponsiveRewardError         bool   `json:"unresponsive_reward_error" api:"required"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		FormulaParseError               respjson.Field
@@ -267,13 +271,13 @@ func (r *FineTuningAlphaGraderValidateResponseGraderUnionInput) UnmarshalJSON(da
 
 type FineTuningAlphaGraderRunParams struct {
 	// The grader used for the fine-tuning job.
-	Grader FineTuningAlphaGraderRunParamsGraderUnion `json:"grader,omitzero,required"`
+	Grader FineTuningAlphaGraderRunParamsGraderUnion `json:"grader,omitzero" api:"required"`
 	// The model sample to be evaluated. This value will be used to populate the
 	// `sample` namespace. See
 	// [the guide](https://platform.openai.com/docs/guides/graders) for more details.
 	// The `output_json` variable will be populated if the model sample is a valid JSON
 	// string.
-	ModelSample string `json:"model_sample,required"`
+	ModelSample string `json:"model_sample" api:"required"`
 	// The dataset item provided to the grader. This will be used to populate the
 	// `item` namespace. See
 	// [the guide](https://platform.openai.com/docs/guides/graders) for more details.
@@ -481,7 +485,7 @@ func init() {
 
 type FineTuningAlphaGraderValidateParams struct {
 	// The grader used for the fine-tuning job.
-	Grader FineTuningAlphaGraderValidateParamsGraderUnion `json:"grader,omitzero,required"`
+	Grader FineTuningAlphaGraderValidateParamsGraderUnion `json:"grader,omitzero" api:"required"`
 	paramObj
 }
 

@@ -37,23 +37,31 @@ func NewRealtimeService(opts ...option.RequestOption) (r RealtimeService) {
 }
 
 type AudioTranscription struct {
+	// Controls how long the model waits before emitting transcription text. Higher
+	// values can improve transcription accuracy at the cost of latency. Only supported
+	// with `gpt-realtime-whisper` in GA Realtime sessions.
+	//
+	// Any of "minimal", "low", "medium", "high", "xhigh".
+	Delay AudioTranscriptionDelay `json:"delay"`
 	// The language of the input audio. Supplying the input language in
 	// [ISO-639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) (e.g. `en`)
 	// format will improve accuracy and latency.
 	Language string `json:"language"`
 	// The model to use for transcription. Current options are `whisper-1`,
 	// `gpt-4o-mini-transcribe`, `gpt-4o-mini-transcribe-2025-12-15`,
-	// `gpt-4o-transcribe`, and `gpt-4o-transcribe-diarize`. Use
-	// `gpt-4o-transcribe-diarize` when you need diarization with speaker labels.
+	// `gpt-4o-transcribe`, `gpt-4o-transcribe-diarize`, and `gpt-realtime-whisper`.
+	// Use `gpt-4o-transcribe-diarize` when you need diarization with speaker labels.
 	Model AudioTranscriptionModel `json:"model"`
 	// An optional text to guide the model's style or continue a previous audio
 	// segment. For `whisper-1`, the
 	// [prompt is a list of keywords](https://platform.openai.com/docs/guides/speech-to-text#prompting).
 	// For `gpt-4o-transcribe` models (excluding `gpt-4o-transcribe-diarize`), the
 	// prompt is a free text string, for example "expect words related to technology".
+	// Prompt is not supported with `gpt-realtime-whisper` in GA Realtime sessions.
 	Prompt string `json:"prompt"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
+		Delay       respjson.Field
 		Language    respjson.Field
 		Model       respjson.Field
 		Prompt      respjson.Field
@@ -77,10 +85,23 @@ func (r AudioTranscription) ToParam() AudioTranscriptionParam {
 	return param.Override[AudioTranscriptionParam](json.RawMessage(r.RawJSON()))
 }
 
+// Controls how long the model waits before emitting transcription text. Higher
+// values can improve transcription accuracy at the cost of latency. Only supported
+// with `gpt-realtime-whisper` in GA Realtime sessions.
+type AudioTranscriptionDelay string
+
+const (
+	AudioTranscriptionDelayMinimal AudioTranscriptionDelay = "minimal"
+	AudioTranscriptionDelayLow     AudioTranscriptionDelay = "low"
+	AudioTranscriptionDelayMedium  AudioTranscriptionDelay = "medium"
+	AudioTranscriptionDelayHigh    AudioTranscriptionDelay = "high"
+	AudioTranscriptionDelayXhigh   AudioTranscriptionDelay = "xhigh"
+)
+
 // The model to use for transcription. Current options are `whisper-1`,
 // `gpt-4o-mini-transcribe`, `gpt-4o-mini-transcribe-2025-12-15`,
-// `gpt-4o-transcribe`, and `gpt-4o-transcribe-diarize`. Use
-// `gpt-4o-transcribe-diarize` when you need diarization with speaker labels.
+// `gpt-4o-transcribe`, `gpt-4o-transcribe-diarize`, and `gpt-realtime-whisper`.
+// Use `gpt-4o-transcribe-diarize` when you need diarization with speaker labels.
 type AudioTranscriptionModel string
 
 const (
@@ -89,6 +110,7 @@ const (
 	AudioTranscriptionModelGPT4oMiniTranscribe2025_12_15 AudioTranscriptionModel = "gpt-4o-mini-transcribe-2025-12-15"
 	AudioTranscriptionModelGPT4oTranscribe               AudioTranscriptionModel = "gpt-4o-transcribe"
 	AudioTranscriptionModelGPT4oTranscribeDiarize        AudioTranscriptionModel = "gpt-4o-transcribe-diarize"
+	AudioTranscriptionModelGPTRealtimeWhisper            AudioTranscriptionModel = "gpt-realtime-whisper"
 )
 
 type AudioTranscriptionParam struct {
@@ -101,11 +123,18 @@ type AudioTranscriptionParam struct {
 	// [prompt is a list of keywords](https://platform.openai.com/docs/guides/speech-to-text#prompting).
 	// For `gpt-4o-transcribe` models (excluding `gpt-4o-transcribe-diarize`), the
 	// prompt is a free text string, for example "expect words related to technology".
+	// Prompt is not supported with `gpt-realtime-whisper` in GA Realtime sessions.
 	Prompt param.Opt[string] `json:"prompt,omitzero"`
+	// Controls how long the model waits before emitting transcription text. Higher
+	// values can improve transcription accuracy at the cost of latency. Only supported
+	// with `gpt-realtime-whisper` in GA Realtime sessions.
+	//
+	// Any of "minimal", "low", "medium", "high", "xhigh".
+	Delay AudioTranscriptionDelay `json:"delay,omitzero"`
 	// The model to use for transcription. Current options are `whisper-1`,
 	// `gpt-4o-mini-transcribe`, `gpt-4o-mini-transcribe-2025-12-15`,
-	// `gpt-4o-transcribe`, and `gpt-4o-transcribe-diarize`. Use
-	// `gpt-4o-transcribe-diarize` when you need diarization with speaker labels.
+	// `gpt-4o-transcribe`, `gpt-4o-transcribe-diarize`, and `gpt-realtime-whisper`.
+	// Use `gpt-4o-transcribe-diarize` when you need diarization with speaker labels.
 	Model AudioTranscriptionModel `json:"model,omitzero"`
 	paramObj
 }
@@ -157,6 +186,9 @@ type RealtimeAudioConfigInputParam struct {
 	// trails off with "uhhm", the model will score a low probability of turn end and
 	// wait longer for the user to continue speaking. This can be useful for more
 	// natural conversations, but may have a higher latency.
+	//
+	// For `gpt-realtime-whisper` transcription sessions, turn detection must be set to
+	// `null`; VAD is not supported.
 	TurnDetection RealtimeAudioInputTurnDetectionUnionParam `json:"turn_detection,omitzero"`
 	// The format of the input audio.
 	Format RealtimeAudioFormatsUnionParam `json:"format,omitzero"`
@@ -222,9 +254,11 @@ type RealtimeAudioConfigOutputParam struct {
 	Format RealtimeAudioFormatsUnionParam `json:"format,omitzero"`
 	// The voice the model uses to respond. Supported built-in voices are `alloy`,
 	// `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`, `marin`, and
-	// `cedar`. Voice cannot be changed during the session once the model has responded
-	// with audio at least once. We recommend `marin` and `cedar` for best quality.
-	Voice RealtimeAudioConfigOutputVoice `json:"voice,omitzero"`
+	// `cedar`. You may also provide a custom voice object with an `id`, for example
+	// `{ "id": "voice_1234" }`. Voice cannot be changed during the session once the
+	// model has responded with audio at least once. We recommend `marin` and `cedar`
+	// for best quality.
+	Voice RealtimeAudioConfigOutputVoiceUnionParam `json:"voice,omitzero"`
 	paramObj
 }
 
@@ -236,24 +270,67 @@ func (r *RealtimeAudioConfigOutputParam) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, r)
 }
 
-// The voice the model uses to respond. Supported built-in voices are `alloy`,
-// `ash`, `ballad`, `coral`, `echo`, `sage`, `shimmer`, `verse`, `marin`, and
-// `cedar`. Voice cannot be changed during the session once the model has responded
-// with audio at least once. We recommend `marin` and `cedar` for best quality.
-type RealtimeAudioConfigOutputVoice string
+// Only one field can be non-zero.
+//
+// Use [param.IsOmitted] to confirm if a field is set.
+type RealtimeAudioConfigOutputVoiceUnionParam struct {
+	OfString param.Opt[string] `json:",omitzero,inline"`
+	// Check if union is this variant with
+	// !param.IsOmitted(union.OfRealtimeAudioConfigOutputVoiceString2)
+	OfRealtimeAudioConfigOutputVoiceString2 param.Opt[string]                      `json:",omitzero,inline"`
+	OfRealtimeAudioConfigOutputVoiceID      *RealtimeAudioConfigOutputVoiceIDParam `json:",omitzero,inline"`
+	paramUnion
+}
+
+func (u RealtimeAudioConfigOutputVoiceUnionParam) MarshalJSON() ([]byte, error) {
+	return param.MarshalUnion(u, u.OfString, u.OfRealtimeAudioConfigOutputVoiceString2, u.OfRealtimeAudioConfigOutputVoiceID)
+}
+func (u *RealtimeAudioConfigOutputVoiceUnionParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, u)
+}
+
+func (u *RealtimeAudioConfigOutputVoiceUnionParam) asAny() any {
+	if !param.IsOmitted(u.OfString) {
+		return &u.OfString.Value
+	} else if !param.IsOmitted(u.OfRealtimeAudioConfigOutputVoiceString2) {
+		return &u.OfRealtimeAudioConfigOutputVoiceString2
+	} else if !param.IsOmitted(u.OfRealtimeAudioConfigOutputVoiceID) {
+		return u.OfRealtimeAudioConfigOutputVoiceID
+	}
+	return nil
+}
+
+type RealtimeAudioConfigOutputVoiceString2 string
 
 const (
-	RealtimeAudioConfigOutputVoiceAlloy   RealtimeAudioConfigOutputVoice = "alloy"
-	RealtimeAudioConfigOutputVoiceAsh     RealtimeAudioConfigOutputVoice = "ash"
-	RealtimeAudioConfigOutputVoiceBallad  RealtimeAudioConfigOutputVoice = "ballad"
-	RealtimeAudioConfigOutputVoiceCoral   RealtimeAudioConfigOutputVoice = "coral"
-	RealtimeAudioConfigOutputVoiceEcho    RealtimeAudioConfigOutputVoice = "echo"
-	RealtimeAudioConfigOutputVoiceSage    RealtimeAudioConfigOutputVoice = "sage"
-	RealtimeAudioConfigOutputVoiceShimmer RealtimeAudioConfigOutputVoice = "shimmer"
-	RealtimeAudioConfigOutputVoiceVerse   RealtimeAudioConfigOutputVoice = "verse"
-	RealtimeAudioConfigOutputVoiceMarin   RealtimeAudioConfigOutputVoice = "marin"
-	RealtimeAudioConfigOutputVoiceCedar   RealtimeAudioConfigOutputVoice = "cedar"
+	RealtimeAudioConfigOutputVoiceString2Alloy   RealtimeAudioConfigOutputVoiceString2 = "alloy"
+	RealtimeAudioConfigOutputVoiceString2Ash     RealtimeAudioConfigOutputVoiceString2 = "ash"
+	RealtimeAudioConfigOutputVoiceString2Ballad  RealtimeAudioConfigOutputVoiceString2 = "ballad"
+	RealtimeAudioConfigOutputVoiceString2Coral   RealtimeAudioConfigOutputVoiceString2 = "coral"
+	RealtimeAudioConfigOutputVoiceString2Echo    RealtimeAudioConfigOutputVoiceString2 = "echo"
+	RealtimeAudioConfigOutputVoiceString2Sage    RealtimeAudioConfigOutputVoiceString2 = "sage"
+	RealtimeAudioConfigOutputVoiceString2Shimmer RealtimeAudioConfigOutputVoiceString2 = "shimmer"
+	RealtimeAudioConfigOutputVoiceString2Verse   RealtimeAudioConfigOutputVoiceString2 = "verse"
+	RealtimeAudioConfigOutputVoiceString2Marin   RealtimeAudioConfigOutputVoiceString2 = "marin"
+	RealtimeAudioConfigOutputVoiceString2Cedar   RealtimeAudioConfigOutputVoiceString2 = "cedar"
 )
+
+// Custom voice reference.
+//
+// The property ID is required.
+type RealtimeAudioConfigOutputVoiceIDParam struct {
+	// The custom voice ID, e.g. `voice_1234`.
+	ID string `json:"id" api:"required"`
+	paramObj
+}
+
+func (r RealtimeAudioConfigOutputVoiceIDParam) MarshalJSON() (data []byte, err error) {
+	type shadow RealtimeAudioConfigOutputVoiceIDParam
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *RealtimeAudioConfigOutputVoiceIDParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
 
 // RealtimeAudioFormatsUnion contains all possible properties and values from
 // [RealtimeAudioFormatsAudioPCM], [RealtimeAudioFormatsAudioPCMU],
@@ -686,7 +763,7 @@ type RealtimeAudioInputTurnDetectionServerVadParam struct {
 	// Type of turn detection, `server_vad` to turn on simple Server VAD.
 	//
 	// This field can be elided, and will marshal its zero value as "server_vad".
-	Type constant.ServerVad `json:"type,required"`
+	Type constant.ServerVad `json:"type" default:"server_vad"`
 	paramObj
 }
 
@@ -720,7 +797,7 @@ type RealtimeAudioInputTurnDetectionSemanticVadParam struct {
 	// Type of turn detection, `semantic_vad` to turn on Semantic VAD.
 	//
 	// This field can be elided, and will marshal its zero value as "semantic_vad".
-	Type constant.SemanticVad `json:"type,required"`
+	Type constant.SemanticVad `json:"type" default:"semantic_vad"`
 	paramObj
 }
 
@@ -806,6 +883,66 @@ func (r *RealtimeFunctionToolParam) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, r)
 }
 
+// Configuration for reasoning-capable Realtime models such as `gpt-realtime-2`.
+type RealtimeReasoning struct {
+	// Constrains effort on reasoning for reasoning-capable Realtime models such as
+	// `gpt-realtime-2`.
+	//
+	// Any of "minimal", "low", "medium", "high", "xhigh".
+	Effort RealtimeReasoningEffort `json:"effort"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Effort      respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r RealtimeReasoning) RawJSON() string { return r.JSON.raw }
+func (r *RealtimeReasoning) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// ToParam converts this RealtimeReasoning to a RealtimeReasoningParam.
+//
+// Warning: the fields of the param type will not be present. ToParam should only
+// be used at the last possible moment before sending a request. Test for this with
+// RealtimeReasoningParam.Overrides()
+func (r RealtimeReasoning) ToParam() RealtimeReasoningParam {
+	return param.Override[RealtimeReasoningParam](json.RawMessage(r.RawJSON()))
+}
+
+// Configuration for reasoning-capable Realtime models such as `gpt-realtime-2`.
+type RealtimeReasoningParam struct {
+	// Constrains effort on reasoning for reasoning-capable Realtime models such as
+	// `gpt-realtime-2`.
+	//
+	// Any of "minimal", "low", "medium", "high", "xhigh".
+	Effort RealtimeReasoningEffort `json:"effort,omitzero"`
+	paramObj
+}
+
+func (r RealtimeReasoningParam) MarshalJSON() (data []byte, err error) {
+	type shadow RealtimeReasoningParam
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *RealtimeReasoningParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// Constrains effort on reasoning for reasoning-capable Realtime models such as
+// `gpt-realtime-2`.
+type RealtimeReasoningEffort string
+
+const (
+	RealtimeReasoningEffortMinimal RealtimeReasoningEffort = "minimal"
+	RealtimeReasoningEffortLow     RealtimeReasoningEffort = "low"
+	RealtimeReasoningEffortMedium  RealtimeReasoningEffort = "medium"
+	RealtimeReasoningEffortHigh    RealtimeReasoningEffort = "high"
+	RealtimeReasoningEffortXhigh   RealtimeReasoningEffort = "xhigh"
+)
+
 // Realtime session object configuration.
 //
 // The property Type is required.
@@ -822,12 +959,16 @@ type RealtimeSessionCreateRequestParam struct {
 	// is not set and are visible in the `session.created` event at the start of the
 	// session.
 	Instructions param.Opt[string] `json:"instructions,omitzero"`
+	// Whether the model may call multiple tools in parallel. Only supported by
+	// reasoning Realtime models such as `gpt-realtime-2`.
+	ParallelToolCalls param.Opt[bool] `json:"parallel_tool_calls,omitzero"`
 	// Reference to a prompt template and its variables.
 	// [Learn more](https://platform.openai.com/docs/guides/text?api-mode=responses#reusable-prompts).
 	Prompt responses.ResponsePromptParam `json:"prompt,omitzero"`
 	// Realtime API can write session traces to the
-	// [Traces Dashboard](/logs?api=traces). Set to null to disable tracing. Once
-	// tracing is enabled for a session, the configuration cannot be modified.
+	// [Traces Dashboard](https://platform.openai.com/logs?api=traces). Set to null to
+	// disable tracing. Once tracing is enabled for a session, the configuration cannot
+	// be modified.
 	//
 	// `auto` will create a trace for the session with default values for the workflow
 	// name, group id, and metadata.
@@ -854,6 +995,8 @@ type RealtimeSessionCreateRequestParam struct {
 	//
 	// Any of "text", "audio".
 	OutputModalities []string `json:"output_modalities,omitzero"`
+	// Configuration for reasoning-capable Realtime models such as `gpt-realtime-2`.
+	Reasoning RealtimeReasoningParam `json:"reasoning,omitzero"`
 	// How the model chooses tools. Provide one of the string modes or force a specific
 	// function/MCP tool.
 	ToolChoice RealtimeToolChoiceConfigUnionParam `json:"tool_choice,omitzero"`
@@ -881,7 +1024,7 @@ type RealtimeSessionCreateRequestParam struct {
 	// The type of session to create. Always `realtime` for the Realtime API.
 	//
 	// This field can be elided, and will marshal its zero value as "realtime".
-	Type constant.Realtime `json:"type,required"`
+	Type constant.Realtime `json:"type" default:"realtime"`
 	paramObj
 }
 
@@ -924,6 +1067,10 @@ type RealtimeSessionCreateRequestModel = string
 
 const (
 	RealtimeSessionCreateRequestModelGPTRealtime                        RealtimeSessionCreateRequestModel = "gpt-realtime"
+	RealtimeSessionCreateRequestModelGPTRealtime1_5                     RealtimeSessionCreateRequestModel = "gpt-realtime-1.5"
+	RealtimeSessionCreateRequestModelGPTRealtime2                       RealtimeSessionCreateRequestModel = "gpt-realtime-2"
+	RealtimeSessionCreateRequestModelGPTRealtime2_1                     RealtimeSessionCreateRequestModel = "gpt-realtime-2.1"
+	RealtimeSessionCreateRequestModelGPTRealtime2_1Mini                 RealtimeSessionCreateRequestModel = "gpt-realtime-2.1-mini"
 	RealtimeSessionCreateRequestModelGPTRealtime2025_08_28              RealtimeSessionCreateRequestModel = "gpt-realtime-2025-08-28"
 	RealtimeSessionCreateRequestModelGPT4oRealtimePreview               RealtimeSessionCreateRequestModel = "gpt-4o-realtime-preview"
 	RealtimeSessionCreateRequestModelGPT4oRealtimePreview2024_10_01     RealtimeSessionCreateRequestModel = "gpt-4o-realtime-preview-2024-10-01"
@@ -934,6 +1081,7 @@ const (
 	RealtimeSessionCreateRequestModelGPTRealtimeMini                    RealtimeSessionCreateRequestModel = "gpt-realtime-mini"
 	RealtimeSessionCreateRequestModelGPTRealtimeMini2025_10_06          RealtimeSessionCreateRequestModel = "gpt-realtime-mini-2025-10-06"
 	RealtimeSessionCreateRequestModelGPTRealtimeMini2025_12_15          RealtimeSessionCreateRequestModel = "gpt-realtime-mini-2025-12-15"
+	RealtimeSessionCreateRequestModelGPTAudio1_5                        RealtimeSessionCreateRequestModel = "gpt-audio-1.5"
 	RealtimeSessionCreateRequestModelGPTAudioMini                       RealtimeSessionCreateRequestModel = "gpt-audio-mini"
 	RealtimeSessionCreateRequestModelGPTAudioMini2025_10_06             RealtimeSessionCreateRequestModel = "gpt-audio-mini-2025-10-06"
 	RealtimeSessionCreateRequestModelGPTAudioMini2025_12_15             RealtimeSessionCreateRequestModel = "gpt-audio-mini-2025-12-15"
@@ -1074,6 +1222,14 @@ func (u RealtimeToolsConfigUnionParam) GetServerLabel() *string {
 }
 
 // Returns a pointer to the underlying variant's property, if present.
+func (u RealtimeToolsConfigUnionParam) GetAllowedCallers() []string {
+	if vt := u.OfMcp; vt != nil {
+		return vt.AllowedCallers
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
 func (u RealtimeToolsConfigUnionParam) GetAllowedTools() *RealtimeToolsConfigUnionMcpAllowedToolsParam {
 	if vt := u.OfMcp; vt != nil {
 		return &vt.AllowedTools
@@ -1093,6 +1249,14 @@ func (u RealtimeToolsConfigUnionParam) GetAuthorization() *string {
 func (u RealtimeToolsConfigUnionParam) GetConnectorID() *string {
 	if vt := u.OfMcp; vt != nil {
 		return &vt.ConnectorID
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u RealtimeToolsConfigUnionParam) GetDeferLoading() *bool {
+	if vt := u.OfMcp; vt != nil && vt.DeferLoading.Valid() {
+		return &vt.DeferLoading.Value
 	}
 	return nil
 }
@@ -1130,6 +1294,14 @@ func (u RealtimeToolsConfigUnionParam) GetServerURL() *string {
 }
 
 // Returns a pointer to the underlying variant's property, if present.
+func (u RealtimeToolsConfigUnionParam) GetTunnelID() *string {
+	if vt := u.OfMcp; vt != nil && vt.TunnelID.Valid() {
+		return &vt.TunnelID.Value
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
 func (u RealtimeToolsConfigUnionParam) GetType() *string {
 	if vt := u.OfFunction; vt != nil {
 		return (*string)(&vt.Type)
@@ -1154,16 +1326,25 @@ func init() {
 // The properties ServerLabel, Type are required.
 type RealtimeToolsConfigUnionMcpParam struct {
 	// A label for this MCP server, used to identify it in tool calls.
-	ServerLabel string `json:"server_label,required"`
+	ServerLabel string `json:"server_label" api:"required"`
 	// An OAuth access token that can be used with a remote MCP server, either with a
 	// custom MCP server URL or a service connector. Your application must handle the
 	// OAuth authorization flow and provide the token here.
 	Authorization param.Opt[string] `json:"authorization,omitzero"`
+	// Whether this MCP tool is deferred and discovered via tool search.
+	DeferLoading param.Opt[bool] `json:"defer_loading,omitzero"`
 	// Optional description of the MCP server, used to provide more context.
 	ServerDescription param.Opt[string] `json:"server_description,omitzero"`
-	// The URL for the MCP server. One of `server_url` or `connector_id` must be
-	// provided.
-	ServerURL param.Opt[string] `json:"server_url,omitzero"`
+	// The URL for the MCP server. One of `server_url`, `connector_id`, or `tunnel_id`
+	// must be provided.
+	ServerURL param.Opt[string] `json:"server_url,omitzero" format:"uri"`
+	// The Secure MCP Tunnel ID to use instead of a direct server URL. One of
+	// `server_url`, `connector_id`, or `tunnel_id` must be provided.
+	TunnelID param.Opt[string] `json:"tunnel_id,omitzero"`
+	// The tool invocation context(s).
+	//
+	// Any of "direct", "programmatic".
+	AllowedCallers []string `json:"allowed_callers,omitzero"`
 	// List of allowed tool names or a filter object.
 	AllowedTools RealtimeToolsConfigUnionMcpAllowedToolsParam `json:"allowed_tools,omitzero"`
 	// Optional HTTP headers to send to the MCP server. Use for authentication or other
@@ -1172,8 +1353,8 @@ type RealtimeToolsConfigUnionMcpParam struct {
 	// Specify which of the MCP server's tools require approval.
 	RequireApproval RealtimeToolsConfigUnionMcpRequireApprovalParam `json:"require_approval,omitzero"`
 	// Identifier for service connectors, like those available in ChatGPT. One of
-	// `server_url` or `connector_id` must be provided. Learn more about service
-	// connectors
+	// `server_url`, `connector_id`, or `tunnel_id` must be provided. Learn more about
+	// service connectors
 	// [here](https://platform.openai.com/docs/guides/tools-remote-mcp#connectors).
 	//
 	// Currently supported `connector_id` values are:
@@ -1194,7 +1375,7 @@ type RealtimeToolsConfigUnionMcpParam struct {
 	// The type of the MCP tool. Always `mcp`.
 	//
 	// This field can be elided, and will marshal its zero value as "mcp".
-	Type constant.Mcp `json:"type,required"`
+	Type constant.Mcp `json:"type" default:"mcp"`
 	paramObj
 }
 
@@ -1432,6 +1613,9 @@ type RealtimeTranscriptionSessionAudioInputParam struct {
 	// trails off with "uhhm", the model will score a low probability of turn end and
 	// wait longer for the user to continue speaking. This can be useful for more
 	// natural conversations, but may have a higher latency.
+	//
+	// For `gpt-realtime-whisper` transcription sessions, turn detection must be set to
+	// `null`; VAD is not supported.
 	TurnDetection RealtimeTranscriptionSessionAudioInputTurnDetectionUnionParam `json:"turn_detection,omitzero"`
 	// The PCM audio format. Only a 24kHz sample rate is supported.
 	Format RealtimeAudioFormatsUnionParam `json:"format,omitzero"`
@@ -1634,7 +1818,7 @@ type RealtimeTranscriptionSessionAudioInputTurnDetectionServerVadParam struct {
 	// Type of turn detection, `server_vad` to turn on simple Server VAD.
 	//
 	// This field can be elided, and will marshal its zero value as "server_vad".
-	Type constant.ServerVad `json:"type,required"`
+	Type constant.ServerVad `json:"type" default:"server_vad"`
 	paramObj
 }
 
@@ -1668,7 +1852,7 @@ type RealtimeTranscriptionSessionAudioInputTurnDetectionSemanticVadParam struct 
 	// Type of turn detection, `semantic_vad` to turn on Semantic VAD.
 	//
 	// This field can be elided, and will marshal its zero value as "semantic_vad".
-	Type constant.SemanticVad `json:"type,required"`
+	Type constant.SemanticVad `json:"type" default:"semantic_vad"`
 	paramObj
 }
 
@@ -1703,7 +1887,7 @@ type RealtimeTranscriptionSessionCreateRequestParam struct {
 	// sessions.
 	//
 	// This field can be elided, and will marshal its zero value as "transcription".
-	Type constant.Transcription `json:"type,required"`
+	Type constant.Transcription `json:"type" default:"transcription"`
 	paramObj
 }
 
@@ -1817,9 +2001,9 @@ type RealtimeTruncationRetentionRatio struct {
 	// the conversation exceeds the input token limit. Setting this to `0.8` means that
 	// messages will be dropped until 80% of the maximum allowed tokens are used. This
 	// helps reduce the frequency of truncations and improve cache rates.
-	RetentionRatio float64 `json:"retention_ratio,required"`
+	RetentionRatio float64 `json:"retention_ratio" api:"required"`
 	// Use retention ratio truncation.
-	Type constant.RetentionRatio `json:"type,required"`
+	Type constant.RetentionRatio `json:"type" default:"retention_ratio"`
 	// Optional custom token limits for this truncation strategy. If not provided, the
 	// model's default token limits will be used.
 	TokenLimits RealtimeTruncationRetentionRatioTokenLimits `json:"token_limits"`
@@ -1882,14 +2066,14 @@ type RealtimeTruncationRetentionRatioParam struct {
 	// the conversation exceeds the input token limit. Setting this to `0.8` means that
 	// messages will be dropped until 80% of the maximum allowed tokens are used. This
 	// helps reduce the frequency of truncations and improve cache rates.
-	RetentionRatio float64 `json:"retention_ratio,required"`
+	RetentionRatio float64 `json:"retention_ratio" api:"required"`
 	// Optional custom token limits for this truncation strategy. If not provided, the
 	// model's default token limits will be used.
 	TokenLimits RealtimeTruncationRetentionRatioTokenLimitsParam `json:"token_limits,omitzero"`
 	// Use retention ratio truncation.
 	//
 	// This field can be elided, and will marshal its zero value as "retention_ratio".
-	Type constant.RetentionRatio `json:"type,required"`
+	Type constant.RetentionRatio `json:"type" default:"retention_ratio"`
 	paramObj
 }
 

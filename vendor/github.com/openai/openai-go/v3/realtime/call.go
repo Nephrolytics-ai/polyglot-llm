@@ -4,9 +4,7 @@ package realtime
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"slices"
 
@@ -39,54 +37,58 @@ func NewCallService(opts ...option.RequestOption) (r CallService) {
 // Accept an incoming SIP call and configure the realtime session that will handle
 // it.
 func (r *CallService) Accept(ctx context.Context, callID string, body CallAcceptParams, opts ...option.RequestOption) (err error) {
-	opts = slices.Concat(r.Options, opts)
+	var preClientOpts = []option.RequestOption{requestconfig.WithBearerAuthSecurity()}
+	opts = slices.Concat(preClientOpts, r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("Accept", "*/*")}, opts...)
 	if callID == "" {
 		err = errors.New("missing required call_id parameter")
-		return
+		return err
 	}
-	path := fmt.Sprintf("realtime/calls/%s/accept", callID)
+	path := requestconfig.FormatPath("realtime/calls/%s/accept", callID)
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, body, nil, opts...)
-	return
+	return err
 }
 
 // End an active Realtime API call, whether it was initiated over SIP or WebRTC.
 func (r *CallService) Hangup(ctx context.Context, callID string, opts ...option.RequestOption) (err error) {
-	opts = slices.Concat(r.Options, opts)
+	var preClientOpts = []option.RequestOption{requestconfig.WithBearerAuthSecurity()}
+	opts = slices.Concat(preClientOpts, r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("Accept", "*/*")}, opts...)
 	if callID == "" {
 		err = errors.New("missing required call_id parameter")
-		return
+		return err
 	}
-	path := fmt.Sprintf("realtime/calls/%s/hangup", callID)
+	path := requestconfig.FormatPath("realtime/calls/%s/hangup", callID)
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, nil, nil, opts...)
-	return
+	return err
 }
 
 // Transfer an active SIP call to a new destination using the SIP REFER verb.
 func (r *CallService) Refer(ctx context.Context, callID string, body CallReferParams, opts ...option.RequestOption) (err error) {
-	opts = slices.Concat(r.Options, opts)
+	var preClientOpts = []option.RequestOption{requestconfig.WithBearerAuthSecurity()}
+	opts = slices.Concat(preClientOpts, r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("Accept", "*/*")}, opts...)
 	if callID == "" {
 		err = errors.New("missing required call_id parameter")
-		return
+		return err
 	}
-	path := fmt.Sprintf("realtime/calls/%s/refer", callID)
+	path := requestconfig.FormatPath("realtime/calls/%s/refer", callID)
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, body, nil, opts...)
-	return
+	return err
 }
 
 // Decline an incoming SIP call by returning a SIP status code to the caller.
 func (r *CallService) Reject(ctx context.Context, callID string, body CallRejectParams, opts ...option.RequestOption) (err error) {
-	opts = slices.Concat(r.Options, opts)
+	var preClientOpts = []option.RequestOption{requestconfig.WithBearerAuthSecurity()}
+	opts = slices.Concat(preClientOpts, r.Options, opts)
 	opts = append([]option.RequestOption{option.WithHeader("Accept", "*/*")}, opts...)
 	if callID == "" {
 		err = errors.New("missing required call_id parameter")
-		return
+		return err
 	}
-	path := fmt.Sprintf("realtime/calls/%s/reject", callID)
+	path := requestconfig.FormatPath("realtime/calls/%s/reject", callID)
 	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, body, nil, opts...)
-	return
+	return err
 }
 
 type CallAcceptParams struct {
@@ -99,13 +101,13 @@ func (r CallAcceptParams) MarshalJSON() (data []byte, err error) {
 	return shimjson.Marshal(r.RealtimeSessionCreateRequest)
 }
 func (r *CallAcceptParams) UnmarshalJSON(data []byte) error {
-	return json.Unmarshal(data, &r.RealtimeSessionCreateRequest)
+	return apijson.UnmarshalRoot(data, r)
 }
 
 type CallReferParams struct {
 	// URI that should appear in the SIP Refer-To header. Supports values like
 	// `tel:+14155550123` or `sip:agent@example.com`.
-	TargetUri string `json:"target_uri,required"`
+	TargetUri string `json:"target_uri" api:"required"`
 	paramObj
 }
 
