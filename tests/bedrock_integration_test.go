@@ -16,7 +16,9 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-const bedrockTestModel = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+const bedrockTestModel = "openai.gpt-oss-120b-1:0"
+
+//const bedrockTestModel = "openai.gpt-5.6-luna"
 
 type BedrockIntegrationSuite struct {
 	ExternalDependenciesSuite
