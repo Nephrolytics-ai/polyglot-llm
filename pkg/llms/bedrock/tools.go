@@ -34,7 +34,7 @@ func buildAllTools(ctx context.Context, cfg model.GeneratorConfig) ([]model.Tool
 	}
 
 	for _, mcpTool := range cfg.MCPTools {
-		authToken := extractAuthorizationHeader(mcpTool.HTTPHeaders)
+		authToken := resolveMCPAuthorization(mcpTool)
 
 		adapter, err := mcp.NewToolAdapter(ctx, mcpTool.URL, authToken, mcpTool.AllowedTools)
 		if err != nil {
@@ -52,6 +52,13 @@ func buildAllTools(ctx context.Context, cfg model.GeneratorConfig) ([]model.Tool
 	}
 
 	return combined, cleanup, nil
+}
+
+func resolveMCPAuthorization(tool model.MCPTool) string {
+	if value := extractAuthorizationHeader(tool.HTTPHeaders); strings.TrimSpace(value) != "" {
+		return value
+	}
+	return strings.TrimSpace(tool.AuthToken)
 }
 
 func mapTools(tools []model.Tool) (*bedrocktypes.ToolConfiguration, map[string]toolHandler, error) {
