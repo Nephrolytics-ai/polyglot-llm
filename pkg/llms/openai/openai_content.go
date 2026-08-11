@@ -556,6 +556,7 @@ func applyOpenAIResponseMetadata(meta model.GenerationMetadata, response *respon
 		if response.Status != "" {
 			meta[model.MetadataKeyResponseStatus] = string(response.Status)
 		}
+		meta[model.MeetaDataServiceTier] = string(response.ServiceTier)
 	}
 }
 

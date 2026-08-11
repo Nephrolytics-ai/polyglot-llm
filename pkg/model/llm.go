@@ -67,6 +67,7 @@ const (
 	MetadataKeyToolRounds        = "tool_rounds"
 	MetadataKeyResponseID        = "response_id"
 	MetadataKeyResponseStatus    = "response_status"
+	MeetaDataServiceTier         = "service_tier"
 )
 
 type PromptContext struct {
