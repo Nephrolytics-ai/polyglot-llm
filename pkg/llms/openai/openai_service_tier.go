@@ -16,6 +16,7 @@ const (
 	ServiceTierStandard ServiceTier = "standard"
 	ServiceTierAuto     ServiceTier = "auto"
 	ServiceTierFlex     ServiceTier = "flex"
+	ServiceTierPriority ServiceTier = "priority"
 )
 
 func WithServiceTier(value ServiceTier) model.GeneratorOption {
@@ -45,6 +46,8 @@ func resolveServiceTier(cfg model.GeneratorConfig) (*responses.ResponseNewParams
 		tier = responses.ResponseNewParamsServiceTierAuto
 	case ServiceTierFlex:
 		tier = responses.ResponseNewParamsServiceTierFlex
+	case ServiceTierPriority:
+		tier = responses.ResponseNewParamsServiceTierPriority
 	default:
 		return nil, utils.WrapIfNotNil(fmt.Errorf("unsupported openai service tier %q", value))
 	}
