@@ -113,6 +113,22 @@ func (s *GeneratorOptionValidationSuite) TestResolveServiceTierMapsFlex() {
 	s.Equal(responses.ResponseNewParamsServiceTierFlex, *tier)
 }
 
+func (s *GeneratorOptionValidationSuite) TestResolveServiceTierMapsFast() {
+	tier, err := resolveServiceTier(model.ResolveGeneratorOpts(WithServiceTier(ServiceTierFast)))
+
+	s.Require().NoError(err)
+	s.Require().NotNil(tier)
+	s.Equal(responses.ResponseNewParamsServiceTier("fast"), *tier)
+}
+
+func (s *GeneratorOptionValidationSuite) TestResolveServiceTierMapsPriority() {
+	tier, err := resolveServiceTier(model.ResolveGeneratorOpts(WithServiceTier(ServiceTierPriority)))
+
+	s.Require().NoError(err)
+	s.Require().NotNil(tier)
+	s.Equal(responses.ResponseNewParamsServiceTierPriority, *tier)
+}
+
 func (s *GeneratorOptionValidationSuite) TestResolveServiceTierReturnsNilWhenUnset() {
 	tier, err := resolveServiceTier(model.ResolveGeneratorOpts())
 
