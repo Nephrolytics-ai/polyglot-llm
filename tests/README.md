@@ -19,7 +19,8 @@ Current credential variable conventions:
 - Optional OpenAI audio setting: `OPENAI_AUDIO_MODEL` (defaults to `whisper-1`)
 - `GEMINI_KEY` for Gemini-backed tests
 - Optional Gemini audio setting: `GEMINI_AUDIO_MODEL` (defaults to `gemini-2.5-flash`)
-- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional `AWS_REGION` for Bedrock-backed tests (or `AWS_PROFILE`)
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional `AWS_SESSION_TOKEN` / `AWS_REGION` for Bedrock-backed tests (or `AWS_PROFILE`)
+- For deployed Bedrock workloads, prefer IAM roles or web identity over long-lived access keys
 - `RUN_OLLAMA_TESTS=true` to enable Ollama-backed tests (requires local Ollama instance and models)
 - Optional Ollama settings: `OLLAMA_BASE_URL`, `OLLAMA_CHAT_MODEL`, `OLLAMA_EMBED_MODEL`
 - `HF_TOKEN` for HuggingFace-backed tests

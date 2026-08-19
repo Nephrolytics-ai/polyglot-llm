@@ -23,6 +23,8 @@ const (
 	defaultRegion    = "us-east-1"
 )
 
+var awsConfigLoader = config.LoadDefaultConfig
+
 type flowUsageTotals struct {
 	APICalls          int
 	ToolRounds        int
@@ -74,13 +76,9 @@ func loadAWSConfig(ctx context.Context) (aws.Config, error) {
 		))
 	case profile != "":
 		loadOpts = append(loadOpts, config.WithSharedConfigProfile(profile))
-	default:
-		return aws.Config{}, utils.WrapIfNotNil(
-			errors.New("missing AWS credentials: set AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY or AWS_PROFILE"),
-		)
 	}
 
-	cfg, err := config.LoadDefaultConfig(ctx, loadOpts...)
+	cfg, err := awsConfigLoader(ctx, loadOpts...)
 	if err != nil {
 		return aws.Config{}, utils.WrapIfNotNil(err)
 	}
