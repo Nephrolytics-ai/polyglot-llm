@@ -111,7 +111,7 @@ Providers may add additional keys, but these should remain stable.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | OpenAI Responses | `pkg/llms/openai` | Yes | Yes | `WithAuthToken`; if omitted, `openai-go` can read `OPENAI_API_KEY` | `WithURL` -> OpenAI client base URL | `openai-go/v3`: `Responses.New`, `Embeddings.New` | Native MCP via OpenAI Responses MCP tool type |
 | Gemini | `pkg/llms/gemini` | Yes | Yes | `WithAuthToken` or env `GEMINI_KEY` | `WithURL` -> `genai.HTTPOptions.BaseURL` | `google.golang.org/genai`: `Models.GenerateContent`, `Models.EmbedContent` | Uses MCP Tool Adapter (`pkg/mcp`) to bridge MCP into normal tool calls |
-| Bedrock | `pkg/llms/bedrock` | Yes | No | Env only: `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` (optional `AWS_SESSION_TOKEN`) OR `AWS_PROFILE`; region from `AWS_REGION` (default `us-east-1`) | `WithURL` -> Bedrock `BaseEndpoint` override | `aws-sdk-go-v2/service/bedrockruntime`: `Converse` | Uses MCP Tool Adapter (`pkg/mcp`) to bridge MCP into normal tool calls |
+| Bedrock | `pkg/llms/bedrock` | Yes | No | Standard AWS SDK chain: static env creds (`AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY`, optional `AWS_SESSION_TOKEN`), named `AWS_PROFILE`, or default provider chain (for example EC2/ECS/IRSA); region from `AWS_REGION` (default `us-east-1`) | `WithURL` -> Bedrock `BaseEndpoint` override | `aws-sdk-go-v2/service/bedrockruntime`: `Converse` | Uses MCP Tool Adapter (`pkg/mcp`) to bridge MCP into normal tool calls |
 | Ollama | `pkg/llms/ollama` | Yes | Yes | None required | `WithURL`, else `OLLAMA_BASE_URL`, else `http://localhost:11434` | Native HTTP `/api/chat` (including tool loop), `/api/embed` with fallback `/api/embeddings` | Uses MCP Tool Adapter (`pkg/mcp`) to bridge MCP into normal tool calls |
 | HuggingFace | `pkg/llms/huggingface` | Yes | Yes | `WithAuthToken` or env `HF_TOKEN` | `WithURL`, else `HF_BASE_URL`, else `https://router.huggingface.co` | Raw HTTP: `/v1/chat/completions` (OpenAI-compatible) for generation, `/hf-inference/models/{model}` (native HF feature-extraction) for embeddings | Uses MCP Tool Adapter (`pkg/mcp`) to bridge MCP into normal tool calls |
 | Anthopic (scaffold) | `pkg/llms/anthopic` | Constructors exist; `Generate` currently returns not-implemented errors | No | Not implemented | Not implemented | Not implemented | Not implemented |
@@ -143,6 +143,7 @@ Providers may add additional keys, but these should remain stable.
 ## Bedrock Details
 
 - Uses Bedrock `Converse` API for generation.
+- Loads credentials through the standard AWS SDK chain when explicit static credentials or `AWS_PROFILE` are not provided, so deployed workloads can rely on IAM roles.
 - Supports local tools through Bedrock `ToolConfiguration`.
 - MCP tools are converted into local tools through `pkg/mcp.ToolAdapter`.
 - Supports `WithTemperature` and `WithMaxTokens` mapping into Bedrock inference config.
